@@ -67,8 +67,10 @@ class EmbedConfig(BaseModel):
     model: str = "bge-m3-mlx-fp16"
     dimension: int = 1024
     batch_size: int = 32
-    timeout: int = 30
+    timeout: int = 120
     max_retries: int = 3
+    max_chars: int = 2000
+    max_length: int = 2048
 
 
 class Config(BaseModel):

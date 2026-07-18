@@ -37,10 +37,11 @@ class EmbedConfig:
     api_key: str = ""               # omlx server doesn't require auth
     model: str = "bge-m3-mlx-fp16"
     dimension: int = 1024
-    batch_size: int = 32
-    timeout: int = 60
-    max_retries: int = 2
-    max_chars: int = 2000           # truncate inputs to this many chars (~512 tokens)
+    batch_size: int = 32            # requests per HTTP call
+    timeout: int = 120              # per-request HTTP timeout (bge-m3 can be slow on long inputs)
+    max_retries: int = 3
+    max_chars: int = 2000           # pre-truncate inputs (client-side, ~512 tokens)
+    max_length: int = 2048          # max tokens (server-side, omlx custom field; bge-m3 max 8192)
     enabled: bool = True
 
 
@@ -133,7 +134,15 @@ class Embedder:
         if not safe_inputs:
             return [[0.0] * self.cfg.dimension for _ in texts]
 
-        body = {"model": self.cfg.model, "input": safe_inputs}
+        # Pass max_length and truncation explicitly. omlx defaults to
+        # max_length=512 tokens (for non-bge models). bge-m3 supports 8192,
+        # so we override. omlx accepts both as custom fields.
+        body = {
+            "model": self.cfg.model,
+            "input": safe_inputs,
+            "max_length": self.cfg.max_length,
+            "truncation": True,
+        }
         last_err: Exception | None = None
         for attempt in range(self.cfg.max_retries):
             try:

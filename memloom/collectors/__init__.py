@@ -3,12 +3,14 @@ from .base import AgentAdapter, CollectorContext
 from .claude_code import ClaudeCodeAdapter
 from .codex import CodexAdapter
 from .generic_jsonl import GenericJSONLAdapter
+from .librechat import LibreChatAdapter
 from .openclaw import OpenClawAdapter
 from .openclaw_sessions import OpenClawSessionAdapter
 
 _REGISTRY: dict[str, type[AgentAdapter]] = {
     OpenClawAdapter.name: OpenClawAdapter,
     OpenClawSessionAdapter.name: OpenClawSessionAdapter,
+    LibreChatAdapter.name: LibreChatAdapter,
     ClaudeCodeAdapter.name: ClaudeCodeAdapter,
     CodexAdapter.name: CodexAdapter,
     GenericJSONLAdapter.name: GenericJSONLAdapter,
@@ -39,6 +41,7 @@ __all__ = [
     "CollectorContext",
     "OpenClawAdapter",
     "OpenClawSessionAdapter",
+    "LibreChatAdapter",
     "ClaudeCodeAdapter",
     "CodexAdapter",
     "GenericJSONLAdapter",

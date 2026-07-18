@@ -19,7 +19,7 @@ def _ctx(transport, run_id="test_run", last_watermarks=None):
 # ---------- registry ----------
 
 def test_registry_has_four_adapters():
-    assert set(known_agents()) == {"openclaw", "openclaw_session", "claude_code", "codex", "generic_jsonl"}
+    assert set(known_agents()) == {"openclaw", "openclaw_session", "librechat", "claude_code", "codex", "generic_jsonl"}
 
 
 def test_get_adapter_unknown_raises():

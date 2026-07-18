@@ -28,6 +28,7 @@ dependencies = [
     "python-dateutil>=2.9",
     "requests>=2.31",
     "sqlite-vec>=0.1.0",
+    "pymongo>=4.17.0",
 ]
 
 [project.optional-dependencies]

@@ -29,7 +29,7 @@ Running
 .. code-block:: bash
 
     export MEMLOOM_INGEST_KEY=memloom_ingest_xxxxxxxx
-    uv run memloom serve --port 8765 --config ./memloom.yaml
+    uv run memloom serve --port 8789 --config ./memloom.yaml
 
 The server listens on ``0.0.0.0`` by default (so it can be reached from
 other machines on the LAN). Set ``--host 127.0.0.1`` to bind locally only.

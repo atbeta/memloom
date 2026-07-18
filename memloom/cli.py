@@ -456,7 +456,7 @@ def init_config(
 def serve(
     config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to YAML config."),
     host: str = typer.Option("0.0.0.0", "--host", help="Bind host (0.0.0.0 for LAN, 127.0.0.1 for local-only)"),
-    port: int = typer.Option(8765, "--port", "-p", help="HTTP port"),
+    port: int = typer.Option(8789, "--port", "-p", help="HTTP port"),
     reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev only)"),
 ) -> None:
     """Run the memloom HTTP ingest server (POST /ingest, GET /health)."""

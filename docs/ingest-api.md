@@ -105,7 +105,7 @@ for row in rows:
 
 # 3. Push
 r = requests.post(
-    "http://192.168.5.101:8765/ingest",
+    "http://192.168.5.101:8789/ingest",
     headers={"Authorization": f"Bearer {KEY}"},
     json={"records": records},
     timeout=300,
@@ -126,7 +126,7 @@ For one-time historical imports:
 python3 my_dump_script.py > /tmp/backfill.json
 
 # 2. Push (split if huge)
-mp ingest --url http://192.168.5.101:8765 --key "$KEY" /tmp/backfill.json
+mp ingest --url http://192.168.5.101:8789 --key "$KEY" /tmp/backfill.json
 
 # 3. If you have lots of content, embed afterwards
 mp embed --config /path/to/memloom.yaml

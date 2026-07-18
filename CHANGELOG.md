@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.1] - 2026-07-19
+
+### Added
+- `openclaw_session` sync adapter — push OpenClaw trajectory sessions via HTTP ingest
+
 ## [0.4.0] - 2026-07-19
 
 ### Added

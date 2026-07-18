@@ -14,6 +14,7 @@ from memloom.sync.antigravity import AntigravityAdapter
 from memloom.sync.codex import CodexAdapter
 from memloom.sync.config import SourceConfig, SyncConfig
 from memloom.sync.kilocode import KiloCodeAdapter
+from memloom.sync.openclaw_session import OpenClawSessionAdapter
 from memloom.sync.opencode import OpenCodeAdapter
 from memloom.sync.qoder import QoderAdapter
 
@@ -326,4 +327,44 @@ def test_qoder_adapter(tmp_path: Path):
 
 def test_qoder_nonexistent_db():
     a = QoderAdapter("/nonexistent/agents.db")
+    assert a.extract() == []
+
+
+# ── OpenClaw session adapter tests ───────────────────────────────────────────
+
+def _make_trajectory_jsonl(path: Path):
+    lines = [
+        json.dumps({"type": "session.started", "ts": "2026-07-18T10:00:00Z", "sessionId": "sid-1", "workspaceDir": "/tmp/myproject", "data": {"agent": "claude"}}),
+        json.dumps({"type": "prompt.submitted", "ts": "2026-07-18T10:00:01Z", "sessionId": "sid-1", "runId": "run-A", "workspaceDir": "/tmp/myproject", "modelId": "anthropic/claude-sonnet-4", "provider": "anthropic", "data": {"prompt": "Help me refactor this module."}}),
+        json.dumps({"type": "model.completed", "ts": "2026-07-18T10:00:05Z", "sessionId": "sid-1", "runId": "run-A", "workspaceDir": "/tmp/myproject", "modelId": "anthropic/claude-sonnet-4", "provider": "anthropic", "data": {"assistantTexts": ["Sure, I will refactor the module step by step."]}}),
+        json.dumps({"type": "prompt.submitted", "ts": "2026-07-18T10:01:00Z", "sessionId": "sid-1", "runId": "run-B", "workspaceDir": "/tmp/myproject", "modelId": "anthropic/claude-sonnet-4", "data": {"prompt": "Also add tests."}}),
+        json.dumps({"type": "model.completed", "ts": "2026-07-18T10:01:10Z", "sessionId": "sid-1", "runId": "run-B", "workspaceDir": "/tmp/myproject", "modelId": "anthropic/claude-sonnet-4", "data": {"assistantTexts": ["Tests added for all edge cases."]}}),
+    ]
+    path.write_text("\n".join(lines))
+    return path
+
+
+def test_openclaw_session_adapter(tmp_path: Path):
+    session_file = tmp_path / "sid-1.trajectory.jsonl"
+    _make_trajectory_jsonl(session_file)
+
+    a = OpenClawSessionAdapter(str(tmp_path))
+    records = a.extract()
+    assert len(records) == 2
+    assert {r.source_key for r in records} == {"sid-1#run-A", "sid-1#run-B"}
+    r = records[0]
+    assert r.source == "openclaw_session"
+    assert "Help me refactor" in r.content
+    assert r.project == "myproject"
+
+
+def test_openclaw_session_skips_deleted(tmp_path: Path):
+    (tmp_path / "test.trajectory.jsonl").write_text("")
+    (tmp_path / "test.deleted.trajectory.jsonl").write_text("{}")
+    a = OpenClawSessionAdapter(str(tmp_path))
+    assert len(a.extract()) == 0
+
+
+def test_openclaw_session_nonexistent():
+    a = OpenClawSessionAdapter("/nonexistent/sessions")
     assert a.extract() == []

@@ -15,6 +15,7 @@ from memloom.sync.codex import CodexAdapter
 from memloom.sync.config import SyncConfig
 from memloom.sync.kilocode import KiloCodeAdapter
 from memloom.sync.opencode import OpenCodeAdapter
+from memloom.sync.openclaw_session import OpenClawSessionAdapter
 from memloom.sync.qoder import QoderAdapter
 
 sync_app = typer.Typer(name="sync", help="Push local agent stores to memloom ingest server.")
@@ -23,6 +24,7 @@ ADAPTER_REGISTRY: dict[str, type[SyncAdapter]] = {
     "opencode": OpenCodeAdapter,
     "codex": CodexAdapter,
     "antigravity": AntigravityAdapter,
+    "openclaw_session": OpenClawSessionAdapter,
     "qoder": QoderAdapter,
     "kilocode": KiloCodeAdapter,
 }

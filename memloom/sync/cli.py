@@ -13,6 +13,7 @@ from memloom.sync.adapter import SyncAdapter, WatermarkStore
 from memloom.sync.antigravity import AntigravityAdapter
 from memloom.sync.codex import CodexAdapter
 from memloom.sync.config import SyncConfig
+from memloom.sync.hermes import HermesAdapter
 from memloom.sync.kilocode import KiloCodeAdapter
 from memloom.sync.opencode import OpenCodeAdapter
 from memloom.sync.openclaw_chat import OpenClawChatAdapter
@@ -28,6 +29,7 @@ ADAPTER_REGISTRY: dict[str, type[SyncAdapter]] = {
     "openclaw_chat": OpenClawChatAdapter,
     "openclaw_session": OpenClawSessionAdapter,
     "qoder": QoderAdapter,
+    "hermes": HermesAdapter,
     "kilocode": KiloCodeAdapter,
 }
 

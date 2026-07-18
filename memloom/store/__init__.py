@@ -1,4 +1,4 @@
 """Store package."""
-from .raw import RawStore
+from .raw import RawStore, VECTOR_DIM
 
-__all__ = ["RawStore"]
+__all__ = ["RawStore", "VECTOR_DIM"]

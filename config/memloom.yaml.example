@@ -75,3 +75,14 @@ anythingllm:
   api_key: ""                   # paste your sk-ai-knowledge-... key here
   workspace_slug: ai-knowledge
   auto_embed: true              # trigger update-embeddings after each push batch
+# Local embedding backend (bge-m3-mlx-fp16 on Mac Studio by default).
+# Used for hybrid search (--hybrid) and the upcoming MCP server.
+embed:
+  enabled: true
+  base_url: http://192.168.5.13:8000
+  api_key: ""                    # omlx server doesn't require auth
+  model: bge-m3-mlx-fp16
+  dimension: 1024
+  batch_size: 32
+  max_chars: 2000                # truncate long inputs to this many chars
+  timeout: 60

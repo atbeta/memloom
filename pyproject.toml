@@ -27,6 +27,7 @@ dependencies = [
     "fabric>=3.2",
     "python-dateutil>=2.9",
     "requests>=2.31",
+    "sqlite-vec>=0.1.0",
 ]
 
 [project.optional-dependencies]

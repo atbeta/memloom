@@ -21,6 +21,28 @@ class Runner:
             replacement=config.privacy.redact_replacement,
         ) if config.privacy.enabled else None
         self.deduper = Deduper()
+        # Optional embedder for hybrid search (v0.4). Lazy-init so disabled config
+        # doesn't slow down plain FTS5 collects.
+        self.embedder = None
+        self._embed_text = None
+        if getattr(config, "embed", None) and config.embed.enabled:
+            try:
+                from .embed import EmbedConfig, Embedder
+                self.embedder = Embedder(EmbedConfig(
+                    base_url=config.embed.base_url,
+                    api_key=config.embed.api_key,
+                    model=config.embed.model,
+                    dimension=config.embed.dimension,
+                    batch_size=config.embed.batch_size,
+                    timeout=config.embed.timeout,
+                    max_retries=config.embed.max_retries,
+                    enabled=True,
+                ))
+                # Bind method for use inside the pull loop
+                self._embed_text = self.embedder.embed_one
+            except Exception as e:
+                # Embedder unavailable — log but don't fail the collect
+                self.embedder = None
 
     # ---- Public entry points ----
 
@@ -131,6 +153,15 @@ class Runner:
                             summary.duplicates += 1
                     except Exception as e:
                         summary.errors.append(f"upsert {record.id}: {e}")
+
+                    # 5b) Embed for hybrid search (v0.4) — best-effort, errors don't fail collect
+                    if self.embedder is not None and record.content:
+                        try:
+                            vec = self._embed_text(record.content)
+                            if vec is not None:
+                                self.store.upsert_vector(record.id, vec)
+                        except Exception as e:
+                            summary.errors.append(f"embed {record.id}: {e}")
 
                     watermarks[f"{wm.source}::{wm.source_key}"] = wm
             except Exception as e:

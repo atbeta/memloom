@@ -1,4 +1,4 @@
-"""CLI entry point (registered as `mp` via pyproject.toml)."""
+"""CLI entry point (registered as `memloom` via pyproject.toml)."""
 from __future__ import annotations
 
 import json
@@ -16,8 +16,8 @@ from .store import RawStore
 
 
 app = typer.Typer(
-    name="mp",
-    help="memory-pipeline: unified agent memory collection.",
+    name="memloom",
+    help="memloom: weave your agents' memories into one searchable fabric.",
     add_completion=False,
     no_args_is_help=True,
 )
@@ -30,7 +30,7 @@ def _load_config_or_die(path: Optional[str]) -> object:
         from .config import HostConfig
         cfg.hosts = [HostConfig(name="local", transport="local")]
     if not cfg.agents:
-        console.print("[yellow]No agents configured. See config/memory-pipeline.yaml.example[/yellow]")
+        console.print("[yellow]No agents configured. See config/memloom.yaml.example[/yellow]")
     return cfg
 
 
@@ -66,6 +66,117 @@ def collect(
 
 
 @app.command()
+def embed(
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    source: Optional[str] = typer.Option(None, "--source", "-s", help="Only embed records from this source."),
+    limit: int = typer.Option(0, "--limit", "-n", help="Max records to embed (0 = all)."),
+    force: bool = typer.Option(False, "--force", help="Re-embed even if already vectorized."),
+    batch_size: int = typer.Option(32, "--batch-size"),
+) -> None:
+    """Backfill (or refresh) embeddings for existing records.
+
+    Useful for:
+      * Vectorizing data ingested before the embedder was configured
+      * Switching to a new embedding model (--force)
+      * Recovering from an embedder outage
+    """
+    cfg = _load_config_or_die(config)
+    from .embed import EmbedConfig, Embedder
+    emb_cfg = getattr(cfg, "embed", None)
+    if emb_cfg is None or not emb_cfg.enabled:
+        console.print("[red]embed.enabled=true required in config.[/red]")
+        raise typer.Exit(1)
+
+    store = RawStore(cfg.pipeline.data_root)
+    embedder = Embedder(EmbedConfig(
+        base_url=emb_cfg.base_url, api_key=emb_cfg.api_key,
+        model=emb_cfg.model, dimension=emb_cfg.dimension,
+        batch_size=emb_cfg.batch_size, timeout=emb_cfg.timeout,
+        max_retries=emb_cfg.max_retries, enabled=True,
+    ))
+
+    if not embedder.health_check():
+        console.print(f"[red]embedder unreachable at {emb_cfg.base_url}[/red]")
+        raise typer.Exit(2)
+
+    # Read all records from raw/ dir
+    import json
+    from .records import MemoryRecord
+    raw_root = Path(store.root) / "raw"
+    if not raw_root.exists():
+        console.print("[yellow]No records to embed.[/yellow]")
+        raise typer.Exit(0)
+    files = list(raw_root.rglob("*.json"))
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    embedded = 0
+    skipped = 0
+    errors: list[str] = []
+    batch_texts: list[str] = []
+    batch_ids: list[str] = []
+    BATCH = batch_size
+
+    def flush():
+        nonlocal embedded, errors
+        if not batch_texts:
+            return
+        try:
+            vecs = embedder.embed_batch(batch_texts)
+        except Exception as e:
+            errors.append(f"batch embed failed: {e}")
+            batch_texts.clear()
+            batch_ids.clear()
+            return
+        for rid, vec in zip(batch_ids, vecs):
+            try:
+                store.upsert_vector(rid, vec)
+                embedded += 1
+            except KeyError:
+                # Record was deleted between scan and embed
+                pass
+            except Exception as e:
+                errors.append(f"upsert_vector {rid}: {e}")
+        batch_texts.clear()
+        batch_ids.clear()
+
+    for p in files:
+        if limit and embedded + len(batch_texts) >= limit:
+            break
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+            rec = MemoryRecord.from_dict(d)
+        except Exception:
+            continue
+        if rec.role.startswith("_"):
+            continue
+        if source and rec.source != source:
+            continue
+        if not rec.content:
+            continue
+        # Skip if already vectorized (unless --force)
+        if not force:
+            with store._connect(store.index_path) as c:
+                rowid = store._record_rowid(c, rec.id)
+                if rowid is not None:
+                    exists = c.execute(
+                        "SELECT 1 FROM records_vec WHERE rowid=?", (rowid,)
+                    ).fetchone()
+                    if exists:
+                        skipped += 1
+                        continue
+        batch_texts.append(rec.content)
+        batch_ids.append(rec.id)
+        if len(batch_texts) >= BATCH:
+            flush()
+    flush()
+
+    console.print(f"[cyan]Embedded: {embedded}  skipped: {skipped}  errors: {len(errors)}[/cyan]")
+    if errors:
+        for e in errors[:5]:
+            console.print(f"  [red]{e}[/red]")
+
+
+@app.command()
 def status(
     config: Optional[str] = typer.Option(None, "--config", "-c"),
 ) -> None:
@@ -75,6 +186,7 @@ def status(
     stats = store.stats()
     console.print(f"[bold]data_root:[/bold] {cfg.pipeline.data_root}")
     console.print(f"[bold]total records:[/bold] {stats['total']}")
+    console.print(f"[bold]vectors:[/bold] {stats.get('vectors', 0)}")
     if stats["by_source"]:
         t = Table(title="By source")
         t.add_column("source")
@@ -106,10 +218,46 @@ def search(
     config: Optional[str] = typer.Option(None, "--config", "-c"),
     source: Optional[str] = typer.Option(None, "--source", "-s"),
     limit: int = typer.Option(20, "--limit", "-n"),
+    hybrid: bool = typer.Option(False, "--hybrid", help="FTS5 + vector RRF fusion (requires embeds)"),
 ) -> None:
-    """Full-text search across collected records."""
+    """Full-text search across collected records (--hybrid adds vector ranking)."""
     cfg = _load_config_or_die(config)
     store = RawStore(cfg.pipeline.data_root)
+
+    if hybrid:
+        from .embed import EmbedConfig, Embedder, EmbedError
+        emb_cfg = getattr(cfg, "embed", None)
+        if emb_cfg is None or not emb_cfg.enabled:
+            console.print("[red]--hybrid requires embed.enabled=true in config.[/red]")
+            raise typer.Exit(1)
+        try:
+            embedder = Embedder(EmbedConfig(
+                base_url=emb_cfg.base_url, api_key=emb_cfg.api_key,
+                model=emb_cfg.model, dimension=emb_cfg.dimension,
+                batch_size=emb_cfg.batch_size, timeout=emb_cfg.timeout,
+                max_retries=emb_cfg.max_retries, enabled=True,
+            ))
+            qvec = embedder.embed_one(query)
+        except EmbedError as e:
+            console.print(f"[red]embed failed: {e}[/red]")
+            raise typer.Exit(2)
+        results = store.hybrid_search(query, qvec, source=source, limit=limit)
+        if not results:
+            console.print("[yellow]No matches.[/yellow]")
+            raise typer.Exit(0)
+        t = Table(title=f"Hybrid: {query!r}")
+        for col in ["source", "role", "rrf", "n", "snippet"]:
+            t.add_column(col)
+        for r in results:
+            snip = (r.get("snippet") or "")[:120]
+            t.add_row(
+                r["source"], r["role"],
+                f"{r.get('rrf_score', 0):.4f}", str(r.get("n_methods", 0)), snip,
+            )
+        console.print(t)
+        return
+
+    # Pure FTS5 path
     results = store.search(query, source=source, limit=limit)
     if not results:
         console.print("[yellow]No matches.[/yellow]")
@@ -132,11 +280,8 @@ def inspect(
     """Print full content of a record by id."""
     cfg = _load_config_or_die(config)
     RawStore(cfg.pipeline.data_root)
-    # We don't expose get-by-id directly; use the markdown mirror under raw/
-    # Walk the raw dir looking for the matching md file. Cheap for v0.1.
     md_files = list(Path(cfg.pipeline.data_root).expanduser().rglob(f"{record_id}.md"))
     if not md_files:
-        # try by rec_ prefix
         md_files = list(Path(cfg.pipeline.data_root).expanduser().rglob(f"*{record_id}*.md"))
     if not md_files:
         console.print(f"[red]Not found: {record_id}[/red]")
@@ -164,10 +309,10 @@ def push(
 
 @app.command()
 def init_config(
-    path: str = typer.Argument("./config/memory-pipeline.yaml", help="Where to write the config."),
+    path: str = typer.Argument("./config/memloom.yaml", help="Where to write the config."),
 ) -> None:
     """Write a starter YAML config to <path>."""
-    src = Path(__file__).resolve().parent.parent / "config" / "memory-pipeline.yaml.example"
+    src = Path(__file__).resolve().parent.parent / "config" / "memloom.yaml.example"
     if not src.exists():
         console.print(f"[red]Example config not found at {src}[/red]")
         raise typer.Exit(1)

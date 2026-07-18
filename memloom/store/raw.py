@@ -1,4 +1,4 @@
-"""Raw store: writes records to disk in three forms + a SQLite FTS5 index.
+"""Raw store: writes records to disk in three forms + SQLite FTS5 + sqlite-vec.
 
 Layout under ``data_root``::
 
@@ -8,14 +8,14 @@ Layout under ``data_root``::
           <source_key_basename>.json    # full structured record
           <source_key_basename>.md      # human-readable mirror
           attachments/                  # optional binary blobs (images, etc.)
-      index.sqlite                      # metadata + FTS5 over content
+      index.sqlite                      # metadata + FTS5 + vec0
       runs.sqlite                       # run history
       watermarks.json                   # per-source incremental cursors
 
-Three writes per record:
-  1. ``raw/<source>/<key>.json`` — full MemoryRecord (canonical)
+Three writes per record (canonical):
+  1. ``raw/<source>/<key>.json`` — full MemoryRecord
   2. ``raw/<source>/<key>.md``   — markdown view (grep/browse friendly)
-  3. ``index.sqlite``            — row + FTS5 entry for retrieval
+  3. ``index.sqlite``            — row + FTS5 entry + vec0 entry for retrieval
 
 Idempotency: writes are keyed by record.id; re-writing the same record is a
 no-op. Collectors can re-run freely.
@@ -24,17 +24,24 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import struct
 import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import sqlite_vec
+
 from ..records import MemoryRecord, RunSummary, Watermark
+
 
 # ---------- Schema ----------
 
-_INDEX_SCHEMA = """
+# Default vector dimension. Matches bge-m3 (1024). Change if you swap models.
+VECTOR_DIM = 1024
+
+_INDEX_SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS records (
   id              TEXT PRIMARY KEY,
   source          TEXT NOT NULL,
@@ -66,6 +73,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(
   tokenize = 'unicode61 remove_diacritics 2'
 );
 
+-- v0.4: vector index for hybrid search (sqlite-vec). rowid == records.rowid.
+-- Created with IF NOT EXISTS so older index.sqlite files get it on next open.
+CREATE VIRTUAL TABLE IF NOT EXISTS records_vec USING vec0(
+  embedding float[{VECTOR_DIM}]
+);
+
 CREATE TABLE IF NOT EXISTS runs (
   run_id        TEXT PRIMARY KEY,
   source        TEXT,
@@ -89,7 +102,7 @@ _RUNS_FILENAME = "runs.sqlite"
 # ---------- Store ----------
 
 class RawStore:
-    """Thread-safe raw store backed by SQLite + filesystem."""
+    """Thread-safe raw store backed by SQLite + filesystem + sqlite-vec."""
 
     def __init__(self, data_root: str | Path) -> None:
         self.root = Path(data_root).expanduser().resolve()
@@ -104,7 +117,12 @@ class RawStore:
 
     def _init_db(self) -> None:
         with self._connect(self.index_path) as c:
+            # Enable sqlite-vec extension
+            c.enable_load_extension(True)
+            sqlite_vec.load(c)
+            c.enable_load_extension(False)
             c.executescript(_INDEX_SCHEMA)
+
         with self._connect(self.runs_path) as c:
             c.executescript(
                 """
@@ -130,6 +148,13 @@ class RawStore:
             c = sqlite3.connect(str(path), timeout=30)
             c.execute("PRAGMA journal_mode=WAL")
             c.execute("PRAGMA synchronous=NORMAL")
+            # Make sure vec0 is available on every connection (cheap: extension is idempotent)
+            try:
+                c.enable_load_extension(True)
+                sqlite_vec.load(c)
+                c.enable_load_extension(False)
+            except Exception:
+                pass
             try:
                 yield c
                 c.commit()
@@ -159,19 +184,27 @@ class RawStore:
             row = c.execute("SELECT 1 FROM records WHERE id=?", (record_id,)).fetchone()
             return row is not None
 
+    def _record_rowid(self, c: sqlite3.Connection, record_id: str) -> int | None:
+        """Get the integer rowid of a record (for joining with records_vec)."""
+        row = c.execute("SELECT rowid FROM records WHERE id=?", (record_id,)).fetchone()
+        return row[0] if row else None
+
     def upsert(self, record: MemoryRecord) -> bool:
-        """Write record to disk + index. Returns True if newly inserted, False if existing."""
+        """Write record to disk + index. Returns True if newly inserted, False if existing.
+
+        Note: this does NOT touch the vector index. Call ``upsert_vector()`` after
+        embedding the record's content. Keeping the two writes separate lets the
+        embedder be a swappable backend (or turned off entirely).
+        """
         json_path, md_path = self._key_to_paths(record.source, record.source_key)
         raw_ref = str(json_path.relative_to(self.root))
 
-        # Always (re)write files so content updates are reflected.
         json_path.write_text(record.to_json(), encoding="utf-8")
         md_path.write_text(record.to_markdown(), encoding="utf-8")
 
         with self._connect(self.index_path) as c:
             existing = c.execute("SELECT 1 FROM records WHERE id=?", (record.id,)).fetchone()
             if existing:
-                # Update in place (id, source, source_key stay)
                 c.execute(
                     """UPDATE records SET
                         agent=?, project=?, visibility=?, role=?,
@@ -224,6 +257,42 @@ class RawStore:
             )
             return True
 
+    # ---- Vector I/O (v0.4) ----
+
+    def upsert_vector(self, record_id: str, vector: list[float]) -> bool:
+        """Store (or replace) the embedding for a record.
+
+        Returns True if a new vector was inserted, False if replaced.
+        Raises KeyError if the record doesn't exist (FTS index must lead).
+        """
+        if len(vector) != VECTOR_DIM:
+            raise ValueError(
+                f"vector dim {len(vector)} != expected {VECTOR_DIM}"
+            )
+        packed = struct.pack(f"<{VECTOR_DIM}f", *vector)
+        with self._connect(self.index_path) as c:
+            rowid = self._record_rowid(c, record_id)
+            if rowid is None:
+                raise KeyError(f"record not found: {record_id}")
+            existing = c.execute(
+                "SELECT 1 FROM records_vec WHERE rowid=?", (rowid,)
+            ).fetchone()
+            if existing:
+                c.execute(
+                    "UPDATE records_vec SET embedding=? WHERE rowid=?",
+                    (packed, rowid),
+                )
+                return False
+            c.execute(
+                "INSERT INTO records_vec(rowid, embedding) VALUES (?, ?)",
+                (rowid, packed),
+            )
+            return True
+
+    def vector_count(self) -> int:
+        with self._connect(self.index_path) as c:
+            return c.execute("SELECT COUNT(*) FROM records_vec").fetchone()[0]
+
     # ---- Run history ----
 
     def record_run(self, summary: RunSummary) -> None:
@@ -265,15 +334,10 @@ class RawStore:
     # ---- Search ----
 
     def search(self, query: str, source: str | None = None, limit: int = 20) -> list[dict]:
-        """Full-text search via FTS5, returns lightweight summaries.
+        """FTS5-only full-text search. Returns lightweight summaries.
 
-        The query is wrapped as an FTS5 phrase so hyphens / dots / other special
-        chars in user input don't blow up the parser. Use a phrase query so
-        `memory-pipeline` matches the literal token rather than being parsed as
-        `column:value`.
+        For hybrid (FTS5 + vector) search, use :meth:`hybrid_search`.
         """
-        # Sanitize: strip surrounding whitespace, escape internal double quotes,
-        # wrap as phrase.
         safe = '"' + query.strip().replace('"', '""') + '"'
         with self._connect(self.index_path) as c:
             if source:
@@ -307,13 +371,111 @@ class RawStore:
             for r in rows
         ]
 
+    def hybrid_search(
+        self,
+        query: str,
+        query_vec: list[float] | None,
+        source: str | None = None,
+        limit: int = 20,
+        rrf_k: int = 60,
+        candidate_k: int = 50,
+    ) -> list[dict]:
+        """Hybrid search: FTS5 (keyword) + sqlite-vec (semantic), fused via RRF.
+
+        Each retriever pulls its top ``candidate_k`` results, then we fuse the
+        rankings with Reciprocal Rank Fusion. A document that both retrievers
+        rank highly will rise to the top.
+
+        If ``query_vec`` is None, falls back to FTS5-only (same as :meth:`search`).
+        """
+        if query_vec is None:
+            return self.search(query, source=source, limit=limit)
+
+        fts_query = '"' + query.strip().replace('"', '""') + '"'
+        packed = struct.pack(f"<{VECTOR_DIM}f", *query_vec)
+
+        # The fusion happens in a single SQL statement.
+        # k=60 is the standard RRF smoothing constant.
+        # We pass query_vec as the second positional parameter (after fts_query)
+        # because sqlite-vec MATCH needs a positional bind.
+        sql = """
+        WITH
+          fts_results AS (
+            SELECT records_fts.id AS id,
+                   ROW_NUMBER() OVER (ORDER BY records_fts.rank) AS rrf_rank
+              FROM records_fts
+              JOIN records r ON r.id = records_fts.id
+             WHERE records_fts MATCH ?
+               AND (? IS NULL OR r.source = ?)
+             ORDER BY records_fts.rank
+             LIMIT ?
+          ),
+          vec_results AS (
+            SELECT r.id AS id,
+                   ROW_NUMBER() OVER (ORDER BY v.distance) AS rrf_rank
+              FROM records_vec v
+              JOIN records r ON r.rowid = v.rowid
+             WHERE v.embedding MATCH ?
+               AND k = ?
+               AND (? IS NULL OR r.source = ?)
+          ),
+          combined AS (
+            SELECT id, 1.0 / (? + rrf_rank) AS score FROM fts_results
+            UNION ALL
+            SELECT id, 1.0 / (? + rrf_rank) AS score FROM vec_results
+          ),
+          scored AS (
+            SELECT id, SUM(score) AS rrf_score, COUNT(*) AS n_methods
+              FROM combined
+             GROUP BY id
+          )
+        SELECT
+          r.id, r.source, r.agent, r.project, r.role,
+          r.captured_at, r.occurred_at, r.json_path,
+          snippet(records_fts, 5, '[', ']', '…', 12) AS snip,
+          s.rrf_score, s.n_methods
+          FROM scored s
+          JOIN records r ON r.id = s.id
+          LEFT JOIN records_fts ON records_fts.id = s.id
+         ORDER BY s.rrf_score DESC, s.n_methods DESC
+         LIMIT ?
+        """
+        with self._connect(self.index_path) as c:
+            try:
+                rows = c.execute(
+                    sql,
+                    (fts_query, source, source, candidate_k,  # fts_results params
+                     packed, candidate_k, source, source,    # vec_results params
+                     rrf_k, rrf_k,                            # combined params
+                     limit),                                  # final limit
+                ).fetchall()
+            except sqlite3.OperationalError as e:
+                # If vector index is empty or not yet populated, fall back
+                if "records_vec" in str(e) or "no such" in str(e).lower():
+                    return self.search(query, source=source, limit=limit)
+                raise
+
+        return [
+            {
+                "id": r[0], "source": r[1], "agent": r[2], "project": r[3],
+                "role": r[4], "captured_at": r[5], "occurred_at": r[6],
+                "json_path": r[7], "snippet": r[8],
+                "rrf_score": r[9], "n_methods": r[10],
+            }
+            for r in rows
+        ]
+
     def stats(self) -> dict:
         with self._connect(self.index_path) as c:
             total = c.execute("SELECT COUNT(*) FROM records").fetchone()[0]
             by_source = dict(c.execute(
                 "SELECT source, COUNT(*) FROM records GROUP BY source ORDER BY 2 DESC"
             ).fetchall())
-        return {"total": total, "by_source": by_source}
+            try:
+                vec_total = c.execute("SELECT COUNT(*) FROM records_vec").fetchone()[0]
+            except sqlite3.OperationalError:
+                vec_total = 0
+        return {"total": total, "by_source": by_source, "vectors": vec_total}
 
     # ---- Watermarks ----
 
@@ -339,4 +501,4 @@ class RawStore:
         self.save_watermarks(wms)
 
 
-__all__ = ["RawStore"]
+__all__ = ["RawStore", "VECTOR_DIM"]

@@ -59,12 +59,25 @@ class AnythingLLMConfig(BaseModel):
     auto_embed: bool = True
 
 
+class EmbedConfig(BaseModel):
+    """Local embedding backend (used for hybrid search via sqlite-vec)."""
+    enabled: bool = True
+    base_url: str = "http://192.168.5.13:8000"
+    api_key: str = ""
+    model: str = "bge-m3-mlx-fp16"
+    dimension: int = 1024
+    batch_size: int = 32
+    timeout: int = 30
+    max_retries: int = 3
+
+
 class Config(BaseModel):
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     hosts: list[HostConfig] = Field(default_factory=list)
     agents: list[AgentInstanceConfig] = Field(default_factory=list)
     anythingllm: AnythingLLMConfig = Field(default_factory=AnythingLLMConfig)
+    embed: EmbedConfig = Field(default_factory=EmbedConfig)
 
     # ---- Helpers ----
 
@@ -149,6 +162,8 @@ __all__ = [
     "PrivacyConfig",
     "HostConfig",
     "AgentInstanceConfig",
+    "AnythingLLMConfig",
+    "EmbedConfig",
     "load_config",
     "find_config",
 ]

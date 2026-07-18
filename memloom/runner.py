@@ -199,6 +199,10 @@ class Runner:
             return {"pushed": 0, "skipped": 0, "embedded": 0, "errors": [],
                     "info": "no records to push"}
 
+        if self.denoiser is not None:
+            records = [self.denoiser.denoise_record(r)[0] for r in records]
+            records = [r for r in records if r.content.strip()]
+
         pusher = AnythingLLMPusher(AnythingLLMConfig(
             base_url=self.config.anythingllm.base_url,
             api_key=self.config.anythingllm.api_key,

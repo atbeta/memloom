@@ -16,14 +16,14 @@ The v0.1 design keeps everything raw — original files are copied (or reference
 to disk in their original form, with derived layers (facts, vector indices,
 graph relations) added on top later. You can always go back to the source.
 
-## v0.1 scope
+## v0.4 scope
 
-* **Agents**: OpenClaw, Claude Code, Codex CLI, Generic JSONL fallback
-* **Hosts**: local + SSH (e.g. Mac Studio collecting from a home server)
+* **Agents (collect)**: OpenClaw, Claude Code, Codex CLI, LibreChat, Generic JSONL
+* **Agents (sync/push)**: OpenCode, Kilo Code, Qoder, Antigravity brain — push local stores to HTTP ingest
+* **Hosts**: local + SSH
 * **Pipeline**: collect → privacy-filter → tag → dedup → persist
-* **Retrieval**: CLI `mp search` over SQLite FTS5
-* **Not in v0.1** (designed for, not implemented): SaaS adapters (GitHub/Feishu/Notion),
-  vector store integration, MCP server, browser extensions
+* **Retrieval**: CLI `mp search` over SQLite FTS5 + vector hybrid search
+* **Ingest server**: FastAPI `POST /ingest` with Bearer auth, privacy filter, auto-embed
 
 ## Install
 
@@ -52,6 +52,9 @@ mp inspect rec_abc123...
 
 # 6. Status
 mp status
+
+# 7. (Push mode) Sync local agent stores to ingest server
+mp sync run ~/.memloom-sync/config.yaml --once
 ```
 
 ## Layout
@@ -63,6 +66,21 @@ data/                          # data_root from config
   index.sqlite                 # FTS5 over all records
   runs.sqlite                  # collector run history
   watermarks.json              # incremental cursors
+```
+
+## Sync config (push mode)
+
+```yaml
+# ~/.memloom-sync/config.yaml
+endpoint: http://192.168.5.101:8789/ingest
+api_key: memloom_ingest_xxxxx
+batch_size: 500
+
+sources:
+  - type: opencode
+    db: ~/.local/share/opencode/opencode.db
+  - type: kilocode
+    session_dir: ~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/tasks
 ```
 
 ## Cron

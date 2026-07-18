@@ -557,5 +557,10 @@ def _fmt_ts(ms: int) -> str:
     return _dt.datetime.fromtimestamp(ms / 1000).isoformat(timespec="seconds")
 
 
+# ── sync subcommand ──────────────────────────────────────────────────────────
+from .sync.cli import sync_app
+
+app.add_typer(sync_app)
+
 if __name__ == "__main__":
     app()

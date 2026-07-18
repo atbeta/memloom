@@ -219,6 +219,46 @@ def create_app(config: Config) -> FastAPI:
     def stats() -> dict:
         return store.stats()
 
+    # ── Search endpoints ──────────────────────────────────────────────────
+
+    from pydantic import BaseModel as PydanticBaseModel
+
+    class SearchResult(PydanticBaseModel):
+        id: str
+        source: str
+        source_key: str
+        role: str
+        content: str
+        score: float
+        agent: str = ""
+
+    @app.get("/search", response_model=list[SearchResult])
+    def search(q: str = "", source: str = "", limit: int = 20, hybrid: bool = True):
+        """Full-text or hybrid search across all collected records."""
+        if not q.strip():
+            return []
+
+        src = source if source else None
+
+        if hybrid and embedder is not None:
+            query_vec = embedder.embed_one(q.strip())
+            results = store.hybrid_search(query=q.strip(), query_vec=query_vec, source=src, limit=limit)
+        else:
+            results = store.search(query=q.strip(), source=src, limit=limit)
+
+        return [
+            SearchResult(
+                id=r.get("id", ""),
+                source=r.get("source", ""),
+                source_key=r.get("source_key", r.get("json_path", "")),
+                role=r.get("role", ""),
+                content=r.get("content", r.get("snip", ""))[:500],
+                score=float(r.get("rrf", r.get("rank", 0))),
+                agent=r.get("agent", ""),
+            )
+            for r in results
+        ]
+
     return app
 
 

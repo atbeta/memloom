@@ -73,9 +73,15 @@ class EmbedConfig(BaseModel):
     max_length: int = 2048
 
 
+class DenoiseConfig(BaseModel):
+    """Content denoising — strip tool output JSON wrapping etc."""
+    enabled: bool = True
+
+
 class Config(BaseModel):
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
+    denoise: DenoiseConfig = Field(default_factory=DenoiseConfig)
     hosts: list[HostConfig] = Field(default_factory=list)
     agents: list[AgentInstanceConfig] = Field(default_factory=list)
     anythingllm: AnythingLLMConfig = Field(default_factory=AnythingLLMConfig)

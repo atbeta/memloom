@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0] - 2026-07-19
+
+### Added
+- Denoiser pipeline step — strips JSON tool output wrapping for cleaner embeddings
+-  config section (enabled by default)
+- Applied in both collector runner and ingest server
+
+
 ## [0.4.3] - 2026-07-19
 
 ### Added

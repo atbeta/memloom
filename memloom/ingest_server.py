@@ -47,7 +47,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from .config import Config, load_config
 from .embed import EmbedConfig, Embedder
-from .pipeline import Deduper, PrivacyFilter, tag_record
+from .pipeline import Deduper, Denoiser, PrivacyFilter, tag_record
 from .records import MemoryRecord
 from .runner import Runner
 from .store import RawStore
@@ -129,6 +129,7 @@ def create_app(config: Config) -> FastAPI:
         )
         if config.privacy.enabled else None
     )
+    denoiser = Denoiser() if getattr(config, "denoise", None) and config.denoise.enabled else None
     deduper = Deduper()
     embedder: Embedder | None = None
     if (
@@ -172,6 +173,10 @@ def create_app(config: Config) -> FastAPI:
                 if not rec.content:
                     errors.append(f"record {i} ({rec.id}): empty after privacy filter")
                     continue
+
+            # 1b) Denoise
+            if denoiser is not None:
+                rec, _changed = denoiser.denoise_record(rec)
 
             # 2) Tag
             rec = tag_record(rec)

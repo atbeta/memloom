@@ -4,7 +4,7 @@ from __future__ import annotations
 from .collectors import AgentAdapter, CollectorContext, get_adapter
 from .collectors.base import CollectorContext
 from .config import Config
-from .pipeline import Deduper, PrivacyFilter, tag_record
+from .pipeline import Deduper, Denoiser, PrivacyFilter, tag_record
 from .records import MemoryRecord, RunSummary, Watermark
 from .store import RawStore
 from .transport import Transport, make_transport
@@ -21,6 +21,7 @@ class Runner:
             replacement=config.privacy.redact_replacement,
         ) if config.privacy.enabled else None
         self.deduper = Deduper()
+        self.denoiser = Denoiser() if getattr(config, "denoise", None) and config.denoise.enabled else None
         # Optional embedder for hybrid search (v0.4). Lazy-init so disabled config
         # doesn't slow down plain FTS5 collects.
         self.embedder = None
@@ -129,6 +130,10 @@ class Runner:
                     # 1) Privacy filter
                     if self.privacy is not None:
                         record, _ = self.privacy.filter_record(record)
+
+                    # 1b) Denoise (unwrap tool output JSON, strip noise)
+                    if self.denoiser is not None:
+                        record, _ = self.denoiser.denoise_record(record)
 
                     # 2) Skip synthetic markers / summaries from main flow
                     if record.role in ("_skip_marker", "_file_summary"):

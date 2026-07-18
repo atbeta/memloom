@@ -1,0 +1,39 @@
+# <type>(<scope>): <subject>            ←  imperative, ≤50 chars, no period
+#
+# |<--           72 chars            -->|
+#
+# <body>                                 ←  wrap at 72 chars, explain WHAT and WHY
+#
+# <footer>                               ←  BREAKING CHANGE: or Refs: #123
+#
+# --- TYPES (Conventional Commits 1.0) ---
+#   feat:     new feature for the user
+#   fix:      bug fix
+#   docs:     docs only (no code change)
+#   style:    formatting, no logic change
+#   refactor: code change that neither fixes a bug nor adds a feature
+#   test:     add/fix tests, no production change
+#   chore:    build, deps, tooling, no production change
+#   build:    build system / external deps
+#   ci:       CI config files/scripts
+#   perf:     performance improvement
+#   revert:   reverts a previous commit
+#
+# --- SCOPES (project-specific, optional) ---
+#   collectors, store, pipeline, transport, vector, mcp, cli,
+#   config, docs, deps, ci
+#
+# --- EXAMPLES ---
+#   feat(collectors): add OpenCode adapter
+#   fix(privacy): strip ghp_ tokens from raw_meta
+#   docs: add AnythingLLM integration guide
+#   refactor!(store): drop legacy v1 schema   ←  ! = BREAKING CHANGE
+#   chore(deps): bump pydantic to 2.13
+#
+# --- FOOTER EXAMPLES ---
+#   BREAKING CHANGE: config now requires `pipeline.data_root`
+#   Refs: #42
+#   Co-authored-by: mico <mico@pbeta.me>
+#
+# Lines starting with '#' are comments and stripped by git.
+# Delete them before saving.

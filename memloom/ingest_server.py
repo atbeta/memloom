@@ -255,9 +255,10 @@ def create_app(config: Config) -> FastAPI:
                 "source": r.get("source", ""),
                 "source_key": r.get("source_key", r.get("json_path", "")),
                 "role": r.get("role", ""),
-                "content": r.get("content", r.get("snip", ""))[:800],
+                "content": r.get("snippet", r.get("snip", ""))[:800],
                 "score": float(r.get("rrf", r.get("rank", 0))),
                 "agent": r.get("agent", ""),
+                "path": r.get("json_path", ""),
             }
             for r in results
         ]

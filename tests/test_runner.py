@@ -1,15 +1,15 @@
 """Tests for the runner — full pipeline end-to-end."""
 import os
 
-from memory_pipeline.config import (
+from memloom.config import (
     AgentInstanceConfig,
     Config,
     HostConfig,
     PipelineConfig,
     PrivacyConfig,
 )
-from memory_pipeline.runner import Runner
-from memory_pipeline.store import RawStore
+from memloom.runner import Runner
+from memloom.store import RawStore
 
 
 def test_runner_collects_openclaw(tmp_path, make_workspace):

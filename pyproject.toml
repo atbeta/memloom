@@ -1,7 +1,7 @@
 [project]
-name = "memory-pipeline"
-version = "0.1.0"
-description = "Unified agent memory collection pipeline — local + SSH, pluggable adapters, raw-preserving data lake."
+name = "memloom"
+version = "0.3.0"
+description = "Weave your agents' memories into one searchable fabric — local-first, pluggable, raw-preserving."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -9,13 +9,22 @@ authors = [
     { name = "mico", email = "mico@pbeta.me" },
 ]
 license = { text = "MIT" }
+keywords = ["ai", "agents", "memory", "rag", "llm", "anythingllm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "pyyaml>=6.0",
     "typer>=0.12",
     "rich>=13.7",
-    "fabric>=3.2",          # SSH transport (paramiko under the hood)
+    "fabric>=3.2",
     "python-dateutil>=2.9",
     "requests>=2.31",
 ]
@@ -29,14 +38,19 @@ dev = [
 ]
 
 [project.scripts]
-mp = "memory_pipeline.cli:app"
+memloom = "memloom.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/atbeta/memloom"
+Repository = "https://github.com/atbeta/memloom"
+Issues = "https://github.com/atbeta/memloom/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["memory_pipeline"]
+packages = ["memloom"]
 
 [tool.ruff]
 line-length = 120
@@ -44,7 +58,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]
-ignore = ["B007", "B017"]  # loop vars (wm, _); blind exception in test paths
+ignore = ["B007", "B017"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

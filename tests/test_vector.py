@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from memory_pipeline.records import MemoryRecord
-from memory_pipeline.vector import AnythingLLMConfig, AnythingLLMPusher
+from memloom.records import MemoryRecord
+from memloom.vector import AnythingLLMConfig, AnythingLLMPusher
 
 
 @dataclass

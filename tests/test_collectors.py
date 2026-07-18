@@ -1,7 +1,7 @@
 """Tests for agent collectors."""
 import json
 
-from memory_pipeline.collectors import (
+from memloom.collectors import (
     ClaudeCodeAdapter,
     CodexAdapter,
     GenericJSONLAdapter,
@@ -9,7 +9,7 @@ from memory_pipeline.collectors import (
     get_adapter,
     known_agents,
 )
-from memory_pipeline.collectors.base import CollectorContext
+from memloom.collectors.base import CollectorContext
 
 
 def _ctx(transport, run_id="test_run", last_watermarks=None):
@@ -19,7 +19,7 @@ def _ctx(transport, run_id="test_run", last_watermarks=None):
 # ---------- registry ----------
 
 def test_registry_has_four_adapters():
-    assert set(known_agents()) == {"openclaw", "claude_code", "codex", "generic_jsonl"}
+    assert set(known_agents()) == {"openclaw", "openclaw_session", "claude_code", "codex", "generic_jsonl"}
 
 
 def test_get_adapter_unknown_raises():
@@ -32,7 +32,7 @@ def test_get_adapter_unknown_raises():
 
 def test_openclaw_adapter_picks_up_files(tmp_path, make_workspace):
     workspace = make_workspace(tmp_path)
-    from memory_pipeline.transport import LocalTransport
+    from memloom.transport import LocalTransport
     t = LocalTransport(root=str(workspace))
 
     adapter = OpenClawAdapter(options={"workspace": str(workspace)})
@@ -58,7 +58,7 @@ def test_openclaw_adapter_picks_up_files(tmp_path, make_workspace):
 
 def test_claude_code_parses_jsonl(tmp_path, make_claude_session):
     session = make_claude_session(tmp_path / "session-abc.jsonl")
-    from memory_pipeline.transport import LocalTransport
+    from memloom.transport import LocalTransport
     t = LocalTransport(root=str(tmp_path))
     adapter = ClaudeCodeAdapter(options={"paths": [str(session.name)]})
 
@@ -91,7 +91,7 @@ def test_claude_code_parses_jsonl(tmp_path, make_claude_session):
 
 def test_codex_parses_jsonl(tmp_path, make_codex_session):
     session = make_codex_session(tmp_path / "rollout-2026-07-18T10-00-00-abc.jsonl")
-    from memory_pipeline.transport import LocalTransport
+    from memloom.transport import LocalTransport
     t = LocalTransport(root=str(tmp_path))
     adapter = CodexAdapter(options={"paths": [str(session.name)]})
 
@@ -113,7 +113,7 @@ def test_codex_parses_jsonl(tmp_path, make_codex_session):
 # ---------- generic_jsonl ----------
 
 def test_generic_jsonl_picks_up_any_jsonl(tmp_path):
-    from memory_pipeline.transport import LocalTransport
+    from memloom.transport import LocalTransport
     d = tmp_path / "logs"
     d.mkdir()
     p = d / "events.jsonl"
@@ -135,7 +135,7 @@ def test_generic_jsonl_picks_up_any_jsonl(tmp_path):
 
 def test_openclaw_adapter_skips_unchanged(tmp_path, make_workspace):
     workspace = make_workspace(tmp_path)
-    from memory_pipeline.transport import LocalTransport
+    from memloom.transport import LocalTransport
     t = LocalTransport(root=str(workspace))
     adapter = OpenClawAdapter(options={"workspace": str(workspace)})
 

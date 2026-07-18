@@ -1,6 +1,6 @@
 """Tests for the raw store."""
-from memory_pipeline.records import MemoryRecord, RunSummary
-from memory_pipeline.store import RawStore
+from memloom.records import MemoryRecord, RunSummary
+from memloom.store import RawStore
 
 
 def test_upsert_and_search(tmp_path):
@@ -43,7 +43,7 @@ def test_stats(tmp_path):
 
 def test_watermark_persistence(tmp_path):
     store = RawStore(tmp_path)
-    from memory_pipeline.records import Watermark
+    from memloom.records import Watermark
     wm = Watermark(source="openclaw", source_key="MEMORY.md", last_seen_ms=12345, last_hash="abc")
     store.upsert_watermark(wm)
     loaded = store.load_watermarks()

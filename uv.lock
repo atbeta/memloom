@@ -510,8 +510,8 @@ wheels = [
 ]
 
 [[package]]
-name = "memory-pipeline"
-version = "0.1.0"
+name = "memloom"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "fabric" },

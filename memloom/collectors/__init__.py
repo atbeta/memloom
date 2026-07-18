@@ -4,9 +4,11 @@ from .claude_code import ClaudeCodeAdapter
 from .codex import CodexAdapter
 from .generic_jsonl import GenericJSONLAdapter
 from .openclaw import OpenClawAdapter
+from .openclaw_sessions import OpenClawSessionAdapter
 
 _REGISTRY: dict[str, type[AgentAdapter]] = {
     OpenClawAdapter.name: OpenClawAdapter,
+    OpenClawSessionAdapter.name: OpenClawSessionAdapter,
     ClaudeCodeAdapter.name: ClaudeCodeAdapter,
     CodexAdapter.name: CodexAdapter,
     GenericJSONLAdapter.name: GenericJSONLAdapter,
@@ -36,6 +38,7 @@ __all__ = [
     "AgentAdapter",
     "CollectorContext",
     "OpenClawAdapter",
+    "OpenClawSessionAdapter",
     "ClaudeCodeAdapter",
     "CodexAdapter",
     "GenericJSONLAdapter",

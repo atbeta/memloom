@@ -7,8 +7,8 @@ server (192.168.5.101).
 """
 import pytest
 
-from memory_pipeline.config import HostConfig
-from memory_pipeline.transport import LocalTransport, SSHTransport, make_transport
+from memloom.config import HostConfig
+from memloom.transport import LocalTransport, SSHTransport, make_transport
 
 
 def test_local_transport_construction():

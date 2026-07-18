@@ -1,5 +1,5 @@
 """Tests for MemoryRecord / Watermark data classes."""
-from memory_pipeline.records import MemoryRecord, Watermark, content_hash, record_id
+from memloom.records import MemoryRecord, Watermark, content_hash, record_id
 
 
 def test_record_id_deterministic():

@@ -1,6 +1,6 @@
 """Tests for the privacy filter."""
-from memory_pipeline.pipeline.privacy import PrivacyFilter
-from memory_pipeline.records import MemoryRecord
+from memloom.pipeline.privacy import PrivacyFilter
+from memloom.records import MemoryRecord
 
 
 def test_strips_openai_key():

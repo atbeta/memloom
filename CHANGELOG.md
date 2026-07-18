@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.4.1] - 2026-07-19
+## [0.4.3] - 2026-07-19
+
+### Added
+- `openclaw_chat` sync adapter — push OpenClaw native `.jsonl` session files
+
+## [0.4.2] - 2026-07-19
 
 ### Added
 - `openclaw_session` sync adapter — push OpenClaw trajectory sessions via HTTP ingest

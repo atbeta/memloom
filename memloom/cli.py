@@ -13,6 +13,12 @@ from rich.table import Table
 from .config import find_config, load_config
 from .runner import Runner
 from .store import RawStore
+from .quarantine import (
+    DEFAULT_TRIVIAL_RE,
+    list_quarantined,
+    move_to_quarantine,
+    restore_from_quarantine,
+)
 
 
 app = typer.Typer(
@@ -305,6 +311,130 @@ def push(
     runner = Runner(cfg)
     result = runner.push_to_anythingllm(source=source, limit=limit, skip_duplicates=not no_dedup)
     console.print(f"[cyan]AnythingLLM push:[/cyan] {result}")
+
+
+# ---- quarantine ----
+
+quarantine_app = typer.Typer(help="Move low-value records out of the active store.")
+app.add_typer(quarantine_app, name="quarantine")
+
+
+@quarantine_app.command("list")
+def quarantine_list(
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+) -> None:
+    """List all quarantined records."""
+    cfg = _load_config_or_die(config)
+    store = RawStore(cfg.pipeline.data_root)
+    items = list_quarantined(store)
+    if not items:
+        console.print("[yellow]No quarantined records.[/yellow]")
+        raise typer.Exit(0)
+    t = Table(title=f"Quarantined records ({len(items)})")
+    for col in ["id", "source", "role", "captured_at", "path"]:
+        t.add_column(col)
+    import datetime as _dt
+    for r in items:
+        ts = _dt.datetime.fromtimestamp(r["captured_at"] / 1000).isoformat(timespec="seconds") if r.get("captured_at") else ""
+        t.add_row(
+            (r.get("id") or "?")[:16],
+            r.get("source") or "",
+            r.get("role") or "",
+            ts,
+            r.get("path") or "",
+        )
+    console.print(t)
+
+
+@quarantine_app.command("add")
+def quarantine_add(
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    record_ids: Optional[list[str]] = typer.Argument(None, help="Specific record IDs to quarantine"),
+    source: Optional[str] = typer.Option(None, "--source", "-s", help="Apply rule to all records in this source"),
+    min_len: int = typer.Option(30, "--min-len", help="Quarantine records shorter than this"),
+    auto: bool = typer.Option(False, "--auto", help="Apply default rules to all records"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    reason: str = typer.Option("manual", "--reason", "-r", help="Why these are being quarantined"),
+) -> None:
+    """Move records to quarantine.
+
+    Modes:
+      * ``mp quarantine add rec_abc rec_def`` — specific record IDs
+      * ``mp quarantine add --source openclaw_session --auto`` — apply default rules
+      * ``mp quarantine add --auto`` — apply rules to all sources
+    """
+    cfg = _load_config_or_die(config)
+    store = RawStore(cfg.pipeline.data_root)
+
+    ids_to_quarantine: list[str] = []
+
+    if record_ids:
+        ids_to_quarantine = list(record_ids)
+    elif auto:
+        from .quarantine import find_quarantine_candidates
+        candidates = list(find_quarantine_candidates(store, sources=[source] if source else None))
+        if not candidates:
+            console.print("[green]No records match quarantine rules.[/green]")
+            raise typer.Exit(0)
+        console.print(f"Found {len(candidates)} candidates. Reasons:")
+        from collections import Counter
+        reasons = Counter(r for _, r in candidates)
+        for reason, count in reasons.most_common():
+            console.print(f"  {count:>4}×  {reason}")
+        # Show a few examples
+        for rec, why in candidates[:5]:
+            console.print(f"  e.g. {rec.id[:16]}  [{rec.role}]  {rec.content[:60]!r}")
+        if not yes:
+            raise typer.Abort()
+        ids_to_quarantine = [r.id for r, _ in candidates]
+    else:
+        console.print("[red]Provide record_ids or use --auto[/red]")
+        raise typer.Exit(1)
+
+    if not ids_to_quarantine:
+        console.print("[yellow]Nothing to do.[/yellow]")
+        raise typer.Exit(0)
+
+    console.print(f"Quarantining {len(ids_to_quarantine)} records...")
+    result = move_to_quarantine(store, ids_to_quarantine, reason=reason)
+    console.print(f"  [green]moved:[/green]     {len(result.moved)}")
+    console.print(f"  [yellow]not_found:[/yellow] {len(result.not_found)}")
+    if result.errors:
+        console.print(f"  [red]errors:[/red]    {len(result.errors)}")
+        for e in result.errors[:5]:
+            console.print(f"    {e}")
+
+
+@quarantine_app.command("restore")
+def quarantine_restore(
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    record_ids: Optional[list[str]] = typer.Argument(None, help="Record IDs to restore"),
+    all: bool = typer.Option(False, "--all", help="Restore everything in quarantine"),
+) -> None:
+    """Move records back from quarantine to the active store."""
+    cfg = _load_config_or_die(config)
+    store = RawStore(cfg.pipeline.data_root)
+
+    if all:
+        items = list_quarantined(store)
+        ids = [r["id"] for r in items if r.get("id")]
+    elif record_ids:
+        ids = list(record_ids)
+    else:
+        console.print("[red]Provide record_ids or --all[/red]")
+        raise typer.Exit(1)
+
+    if not ids:
+        console.print("[yellow]Nothing to restore.[/yellow]")
+        raise typer.Exit(0)
+    result = restore_from_quarantine(store, ids)
+    console.print(f"  [green]moved:[/green]     {len(result['moved'])}")
+    if result["not_found"]:
+        console.print(f"  [yellow]not_found:[/yellow] {len(result['not_found'])}")
+    if result["errors"]:
+        console.print(f"  [red]errors:[/red]    {len(result['errors'])}")
+        for e in result["errors"][:5]:
+            console.print(f"    {e}")
 
 
 @app.command()

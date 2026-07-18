@@ -453,6 +453,95 @@ def init_config(
 
 
 @app.command()
+def serve(
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to YAML config."),
+    host: str = typer.Option("0.0.0.0", "--host", help="Bind host (0.0.0.0 for LAN, 127.0.0.1 for local-only)"),
+    port: int = typer.Option(8765, "--port", "-p", help="HTTP port"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev only)"),
+) -> None:
+    """Run the memloom HTTP ingest server (POST /ingest, GET /health)."""
+    import os
+    if not os.environ.get("MEMLOOM_INGEST_KEY"):
+        from .ingest_server import generate_key
+        key = generate_key()
+        console.print("[red]MEMLOOM_INGEST_KEY is not set[/red]")
+        console.print(f"\n  Generated a fresh key for you:")
+        console.print(f"  [cyan]{key}[/cyan]\n")
+        console.print("  Set it before starting the server:")
+        console.print(f"  [green]export MEMLOOM_INGEST_KEY={key}[/green]\n")
+        raise typer.Exit(1)
+
+    cfg = _load_config_or_die(config)
+    from .ingest_server import create_app
+    import uvicorn
+    app = create_app(cfg)
+    console.print(f"[green]memloom-ingest server starting on http://{host}:{port}[/green]")
+    console.print(f"  data_root: {cfg.pipeline.data_root}")
+    console.print("  endpoints:")
+    console.print("    POST /ingest   (Bearer auth)")
+    console.print("    GET  /health   (no auth)")
+    console.print("    GET  /stats    (no auth)")
+    uvicorn.run(app, host=host, port=port, reload=reload, log_level="info")
+
+
+@app.command()
+def ingest(
+    file: str = typer.Argument(..., help="Path to JSON file with records."),
+    url: str = typer.Option("http://127.0.0.1:8765", "--url", help="memloom-ingest server URL"),
+    api_key: Optional[str] = typer.Option(None, "--key", help="Bearer token (or set MEMLOOM_INGEST_KEY env)"),
+    skip_embed: bool = typer.Option(False, "--skip-embed", help="Don't auto-embed on server side"),
+) -> None:
+    """Push records from a JSON file to a memloom-ingest server.
+
+    File format: either a list of records, or ``{"records": [...]}``.
+    Each record is a dict that will be parsed into a MemoryRecord.
+    """
+    import json
+    import os
+    import requests
+
+    key = api_key or os.environ.get("MEMLOOM_INGEST_KEY")
+    if not key:
+        console.print("[red]Provide --key or set MEMLOOM_INGEST_KEY env var[/red]")
+        raise typer.Exit(1)
+
+    with open(file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        records = data
+    elif isinstance(data, dict) and "records" in data:
+        records = data["records"]
+        if data.get("skip_embed"):
+            skip_embed = True
+    else:
+        console.print("[red]File must be a list of records or {records: [...]}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"  pushing {len(records)} records → {url}")
+    try:
+        r = requests.post(
+            f"{url}/ingest",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"records": records, "skip_embed": skip_embed},
+            timeout=300,
+        )
+        r.raise_for_status()
+        result = r.json()
+    except requests.RequestException as e:
+        console.print(f"[red]push failed: {e}[/red]")
+        if e.response is not None:
+            console.print(f"  server response: {e.response.text[:300]}")
+        raise typer.Exit(2)
+
+    console.print(f"  [green]accepted:[/green] {result.get('accepted', 0)}")
+    console.print(f"  [yellow]skipped:[/yellow]  {result.get('skipped', 0)}")
+    if result.get("errors"):
+        console.print(f"  [red]errors:[/red]    {len(result['errors'])}")
+        for e in result["errors"][:5]:
+            console.print(f"    {e}")
+
+
+@app.command()
 def agents() -> None:
     """List built-in agent adapters."""
     from .collectors import known_agents

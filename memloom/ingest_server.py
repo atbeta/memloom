@@ -232,7 +232,7 @@ def create_app(config: Config) -> FastAPI:
         score: float
         agent: str = ""
 
-    @app.get("/search")
+    @app.get("/api/search")
     def search(q: str = "", source: str = "", limit: int = 20, hybrid: bool = True):
         """Full-text or hybrid search across all collected records."""
         if not q.strip():

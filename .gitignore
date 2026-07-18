@@ -28,4 +28,4 @@ data/cron.log
 # Tool caches
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
+.ingest-key

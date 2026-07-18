@@ -91,13 +91,51 @@ Agents ──► Collectors ──► Pipeline ──► RawStore
 
 ## Adding a new agent
 
-1. Subclass `AgentAdapter` in `memory_pipeline/collectors/your_agent.py`.
+1. Subclass `AgentAdapter` in `memloom/collectors/your_agent.py`.
 2. Implement `discover()` (return list of `Source`) and `pull()` (yield
    `(MemoryRecord, Watermark)` pairs).
-3. Register in `memory_pipeline/collectors/__init__.py:_REGISTRY`.
+3. Register in `memloom/collectors/__init__.py:_REGISTRY`.
 4. Add a config block under `agents:`.
 
 That's it — pipeline + transport + store need zero changes.
+
+## Commit message format
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/) (English,
+unless otherwise stated). Every commit message **must** match this format:
+
+```
+<type>(<scope>): <subject>     ←  ≤72 chars, imperative, no period
+
+[optional body]                 ←  wrap at ~72 chars, explain WHAT and WHY
+
+[optional footer]               ←  BREAKING CHANGE: or Refs: #123
+```
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`,
+`build`, `ci`, `perf`, `revert`. **Breaking changes** use a `!` after the
+type/scope (`feat(api)!: drop v1 endpoint`) or a `BREAKING CHANGE:` footer.
+
+**Scopes** (project-specific): `collectors`, `store`, `pipeline`,
+`transport`, `vector`, `mcp`, `cli`, `config`, `docs`, `deps`, `ci`.
+
+The repo ships with a `.gitmessage` template and a `commit-msg` git hook
+that enforces the format. To enable the hook after cloning:
+
+```bash
+./scripts/install-hooks.sh
+git config commit.template .gitmessage
+```
+
+Examples:
+
+```
+feat(collectors): add OpenCode adapter
+fix(privacy): strip ghp_ tokens from raw_meta
+docs: add AnythingLLM integration guide
+refactor(store)!: drop legacy v1 schema
+chore(deps): bump pydantic to 2.13
+```
 
 ## Future (architecture already supports it)
 

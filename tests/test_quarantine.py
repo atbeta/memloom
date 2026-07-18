@@ -102,16 +102,22 @@ def test_finds_synthetic_roles():
 
 
 def test_finds_incomplete_conversation_turn():
-    """A conversation_turn with no USER section is likely truncated/incomplete."""
+    """A conversation_turn with NEITHER USER nor ASSISTANT is broken.
+    Turns with only one of the two are valid (multi-turn continuation).
+    """
     store, tmp = _make_store_with([
-        _rec("r1", "**ASSISTANT** (model): no user message here"),
-        _rec("r2", "**USER**: hello\n\n**ASSISTANT**: hi"),
+        _rec("r1", "this is just random text with no markers", role="conversation_turn"),
+        _rec("r2", "**ASSISTANT** (model): only assistant here, valid multi-turn"),
+        _rec("r3", "**USER**: only user here, valid single-shot"),
+        _rec("r4", "**USER**: hello\n\n**ASSISTANT**: hi"),
     ])
     try:
         candidates = list(find_quarantine_candidates(store))
         ids = {r.id for r, _ in candidates}
-        assert "r1" in ids
-        assert "r2" not in ids
+        assert "r1" in ids   # no markers → broken
+        assert "r2" not in ids  # ASSISTANT only → valid
+        assert "r3" not in ids  # USER only → valid
+        assert "r4" not in ids  # both → valid
     finally:
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)

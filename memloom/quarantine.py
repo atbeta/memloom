@@ -108,9 +108,15 @@ def _matches_rule(
         return True, f"too short ({len(content)} chars < {min_len})"
     if trivial_re.match(content):
         return True, f"trivial content (matched {trivial_re.pattern!r})"
-    # Heuristic: conversation_turn records with no USER content are incomplete
-    if rec.role == "conversation_turn" and "**USER**" not in (rec.content or ""):
-        return True, "no USER content in conversation_turn"
+    # Heuristic: a conversation_turn with NEITHER USER nor ASSISTANT marker
+    # is broken (parser failed). A turn with only one of the two is fine
+    # (e.g. multi-turn continuation where the user message is in a previous
+    # record, or a single-shot question with no follow-up).
+    if rec.role == "conversation_turn":
+        has_user = "**USER**" in (rec.content or "")
+        has_assistant = "**ASSISTANT**" in (rec.content or "")
+        if not has_user and not has_assistant:
+            return True, "conversation_turn with no USER or ASSISTANT marker"
     return False, ""
 
 

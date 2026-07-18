@@ -50,11 +50,21 @@ class AgentInstanceConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+class AnythingLLMConfig(BaseModel):
+    """AnythingLLM vector backend config."""
+    enabled: bool = False
+    base_url: str = "http://ai-knowledge:3001"
+    api_key: str = ""
+    workspace_slug: str = "ai-knowledge"
+    auto_embed: bool = True
+
+
 class Config(BaseModel):
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     hosts: list[HostConfig] = Field(default_factory=list)
     agents: list[AgentInstanceConfig] = Field(default_factory=list)
+    anythingllm: AnythingLLMConfig = Field(default_factory=AnythingLLMConfig)
 
     # ---- Helpers ----
 

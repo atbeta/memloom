@@ -24,3 +24,8 @@ data/cron.log
 .DS_Store
 .idea/
 .vscode/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

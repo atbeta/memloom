@@ -17,6 +17,7 @@ dependencies = [
     "rich>=13.7",
     "fabric>=3.2",          # SSH transport (paramiko under the hood)
     "python-dateutil>=2.9",
+    "requests>=2.31",
 ]
 
 [project.optional-dependencies]

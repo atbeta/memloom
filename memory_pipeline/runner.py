@@ -5,7 +5,7 @@ from .collectors import AgentAdapter, CollectorContext, get_adapter
 from .collectors.base import CollectorContext
 from .config import Config
 from .pipeline import Deduper, PrivacyFilter, tag_record
-from .records import RunSummary, Watermark
+from .records import MemoryRecord, RunSummary, Watermark
 from .store import RawStore
 from .transport import Transport, make_transport
 
@@ -139,6 +139,70 @@ class Runner:
         summary.finish()
         self.store.record_run(summary)
         return summary
+
+    # ---- AnythingLLM push ----
+
+    def push_to_anythingllm(
+        self,
+        source: str | None = None,
+        limit: int = 500,
+        skip_duplicates: bool = True,
+    ) -> dict:
+        """Push records from the local store into AnythingLLM.
+
+        Records are ordered newest-first. We dedupe against anything already
+        uploaded to the workspace (by checking doc titles).
+        """
+        if not self.config.anythingllm.enabled:
+            return {"error": "AnythingLLM not enabled in config"}
+
+        from .vector import AnythingLLMConfig, AnythingLLMPusher
+
+        records = self._load_records_for_push(source=source, limit=limit)
+        if not records:
+            return {"pushed": 0, "skipped": 0, "embedded": 0, "errors": [],
+                    "info": "no records to push"}
+
+        pusher = AnythingLLMPusher(AnythingLLMConfig(
+            base_url=self.config.anythingllm.base_url,
+            api_key=self.config.anythingllm.api_key,
+            workspace_slug=self.config.anythingllm.workspace_slug,
+            auto_embed=self.config.anythingllm.auto_embed,
+        ))
+        if not pusher.health_check():
+            return {"pushed": 0, "skipped": 0, "embedded": 0,
+                    "errors": [f"anythingllm not reachable at {self.config.anythingllm.base_url}"]}
+
+        return pusher.push_records(records, skip_duplicates=skip_duplicates)
+
+    def _load_records_for_push(
+        self,
+        source: str | None = None,
+        limit: int = 500,
+    ) -> list:
+        """Read back records from the store as MemoryRecord objects."""
+        import json as _json
+        from pathlib import Path
+        raw_root = Path(self.store.root) / "raw"
+        if not raw_root.exists():
+            return []
+        records: list = []
+        files = list(raw_root.rglob("*.json"))
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in files:
+            try:
+                d = _json.loads(p.read_text(encoding="utf-8"))
+                rec = MemoryRecord.from_dict(d)
+            except Exception:
+                continue
+            if source and rec.source != source:
+                continue
+            if rec.role.startswith("_"):
+                continue
+            records.append(rec)
+            if len(records) >= limit:
+                break
+        return records
 
 
 __all__ = ["Runner"]

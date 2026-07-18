@@ -65,3 +65,13 @@ agents:
   #   options:
   #     paths:
   #       - "~/.claude/projects/**/*.jsonl"
+
+# AnythingLLM vector backend — push collected records here for semantic search.
+# Get the API key from AnythingLLM → Settings → API keys (or from
+# anythingllm.db `api_keys` table).
+anythingllm:
+  enabled: false                # flip to true after configuring api_key
+  base_url: http://ai-knowledge:3001
+  api_key: ""                   # paste your sk-ai-knowledge-... key here
+  workspace_slug: ai-knowledge
+  auto_embed: true              # trigger update-embeddings after each push batch

@@ -1,15 +1,19 @@
 """CLI entry point (registered as `mp` via pyproject.toml)."""
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from .config import load_config
+from .config import find_config, load_config
 from .runner import Runner
 from .store import RawStore
+
 
 app = typer.Typer(
     name="mp",
@@ -20,7 +24,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _load_config_or_die(path: str | None) -> object:
+def _load_config_or_die(path: Optional[str]) -> object:
     cfg = load_config(path)
     if not cfg.hosts:
         from .config import HostConfig
@@ -32,9 +36,10 @@ def _load_config_or_die(path: str | None) -> object:
 
 @app.command()
 def collect(
-    config: str | None = typer.Option(None, "--config", "-c", help="Path to YAML config."),
-    agents: str | None = typer.Option(None, "--agents", "-a", help="Comma-separated agent types to run."),
-    hosts: str | None = typer.Option(None, "--hosts", help="Comma-separated host names to run."),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to YAML config."),
+    agents: Optional[str] = typer.Option(None, "--agents", "-a", help="Comma-separated agent types to run."),
+    hosts: Optional[str] = typer.Option(None, "--hosts", help="Comma-separated host names to run."),
+    push: bool = typer.Option(False, "--push", help="Push to AnythingLLM after collection."),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Run one collection pass."""
@@ -55,10 +60,14 @@ def collect(
         )
     console.print(table)
 
+    if push:
+        pushed = runner.push_to_anythingllm()
+        console.print(f"[cyan]AnythingLLM push:[/cyan] {pushed}")
+
 
 @app.command()
 def status(
-    config: str | None = typer.Option(None, "--config", "-c"),
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Show collection stats and recent runs."""
     cfg = _load_config_or_die(config)
@@ -68,7 +77,8 @@ def status(
     console.print(f"[bold]total records:[/bold] {stats['total']}")
     if stats["by_source"]:
         t = Table(title="By source")
-        t.add_column("source"); t.add_column("count", justify="right")
+        t.add_column("source")
+        t.add_column("count", justify="right")
         for s, n in stats["by_source"].items():
             t.add_row(s, str(n))
         console.print(t)
@@ -80,7 +90,8 @@ def status(
             t.add_column(col)
         import datetime as _dt
         for r in runs:
-            ts = _dt.datetime.fromtimestamp(r["started_at"] / 1000).isoformat(timespec="seconds") if r["started_at"] else ""
+            started = r["started_at"]
+            ts = _dt.datetime.fromtimestamp(started / 1000).isoformat(timespec="seconds") if started else ""
             t.add_row(
                 ts, r["source"] or "", r["host"] or "",
                 str(r["new_records"]), str(r["duplicates"]), str(r["filtered"]),
@@ -92,8 +103,8 @@ def status(
 @app.command()
 def search(
     query: str = typer.Argument(..., help="FTS5 query string."),
-    config: str | None = typer.Option(None, "--config", "-c"),
-    source: str | None = typer.Option(None, "--source", "-s"),
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    source: Optional[str] = typer.Option(None, "--source", "-s"),
     limit: int = typer.Option(20, "--limit", "-n"),
 ) -> None:
     """Full-text search across collected records."""
@@ -116,11 +127,11 @@ def search(
 @app.command()
 def inspect(
     record_id: str = typer.Argument(..., help="Record id (rec_...)"),
-    config: str | None = typer.Option(None, "--config", "-c"),
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Print full content of a record by id."""
     cfg = _load_config_or_die(config)
-    store = RawStore(cfg.pipeline.data_root)
+    RawStore(cfg.pipeline.data_root)
     # We don't expose get-by-id directly; use the markdown mirror under raw/
     # Walk the raw dir looking for the matching md file. Cheap for v0.1.
     md_files = list(Path(cfg.pipeline.data_root).expanduser().rglob(f"{record_id}.md"))
@@ -131,6 +142,24 @@ def inspect(
         console.print(f"[red]Not found: {record_id}[/red]")
         raise typer.Exit(1)
     console.print(md_files[0].read_text(encoding="utf-8"))
+
+
+@app.command()
+def push(
+    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    source: Optional[str] = typer.Option(None, "--source", "-s", help="Only push records from this source."),
+    limit: int = typer.Option(500, "--limit", "-n", help="Max records to push (newest first)."),
+    no_dedup: bool = typer.Option(False, "--no-dedup", help="Push even if already in AnythingLLM."),
+) -> None:
+    """Push collected records into AnythingLLM for semantic search."""
+    cfg = _load_config_or_die(config)
+    if not cfg.anythingllm.enabled:
+        console.print("[red]AnythingLLM not enabled in config.[/red]")
+        raise typer.Exit(1)
+
+    runner = Runner(cfg)
+    result = runner.push_to_anythingllm(source=source, limit=limit, skip_duplicates=not no_dedup)
+    console.print(f"[cyan]AnythingLLM push:[/cyan] {result}")
 
 
 @app.command()

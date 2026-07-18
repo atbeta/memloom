@@ -5,6 +5,7 @@ from .collectors import AgentAdapter, CollectorContext, get_adapter
 from .collectors.base import CollectorContext
 from .config import Config
 from .pipeline import Deduper, Denoiser, PrivacyFilter, tag_record
+from .pipeline.step import PluggablePipeline, REGISTRY as STEP_REGISTRY
 from .records import MemoryRecord, RunSummary, Watermark
 from .store import RawStore
 from .transport import Transport, make_transport
@@ -22,6 +23,10 @@ class Runner:
         ) if config.privacy.enabled else None
         self.deduper = Deduper()
         self.denoiser = Denoiser() if getattr(config, "denoise", None) and config.denoise.enabled else None
+
+        # Pluggable pipeline (v0.6): build from config.pipeline.steps, fallback to hardcoded chain
+        self.pipeline = self._build_pipeline(config)
+
         # Optional embedder for hybrid search (v0.4). Lazy-init so disabled config
         # doesn't slow down plain FTS5 collects.
         self.embedder = None
@@ -44,6 +49,46 @@ class Runner:
             except Exception as e:
                 # Embedder unavailable — log but don't fail the collect
                 self.embedder = None
+
+    def _build_pipeline(self, config: Config) -> PluggablePipeline:
+        """Build pipeline from config.pipeline.steps, falling back to hardcoded chain."""
+        from .pipeline.builtins import (  # noqa: F811 - triggers registration
+            ChunkerStep, DedupStep, DenoiseStep, PrivacyStep, TagStep,
+        )
+
+        pipeline = PluggablePipeline()
+
+        # Check if config specifies step list
+        step_names = getattr(config.pipeline, "steps", None)
+        if step_names:
+            for name in step_names:
+                cls = STEP_REGISTRY.get(name)
+                if cls is None:
+                    continue
+                if name == "privacy" and not config.privacy.enabled:
+                    continue
+                if name == "denoise" and not (getattr(config, "denoise", None) and config.denoise.enabled):
+                    continue
+                kwargs = {}
+                if name == "chunker":
+                    kwargs["target_size"] = getattr(config.pipeline, "chunk_size", 8192)
+                if name == "privacy":
+                    kwargs["patterns"] = config.privacy.strip_patterns
+                    kwargs["replacement"] = config.privacy.redact_replacement
+                pipeline.add(cls(**kwargs))
+        else:
+            # Fallback: hardcoded chain (backward compat)
+            if self.privacy is not None:
+                pipeline.add(PrivacyStep(
+                    patterns=config.privacy.strip_patterns,
+                    replacement=config.privacy.redact_replacement,
+                ))
+            if self.denoiser is not None:
+                pipeline.add(DenoiseStep())
+            pipeline.add(TagStep())
+            # Dedup is handled separately in the loop (needs watermarks)
+
+        return pipeline
 
     # ---- Public entry points ----
 
@@ -127,46 +172,35 @@ class Runner:
             src.host = host_name
             try:
                 for record, wm in adapter.pull(src, ctx):
-                    # 1) Privacy filter
-                    if self.privacy is not None:
-                        record, _ = self.privacy.filter_record(record)
+                    # Run through pluggable pipeline (privacy → denoise → tag → chunker)
+                    for processed in self.pipeline.run(record):
+                        # Skip synthetic markers
+                        if processed.role in ("_skip_marker", "_file_summary"):
+                            continue
 
-                    # 1b) Denoise (unwrap tool output JSON, strip noise)
-                    if self.denoiser is not None:
-                        record, _ = self.denoiser.denoise_record(record)
-
-                    # 2) Skip synthetic markers / summaries from main flow
-                    if record.role in ("_skip_marker", "_file_summary"):
-                        watermarks[f"{wm.source}::{wm.source_key}"] = wm
-                        continue
-
-                    # 3) Tag (project/visibility/tags)
-                    record = tag_record(record)
-
-                    # 4) Dedup
-                    if not self.deduper.is_new(record):
-                        summary.duplicates += 1
-                        watermarks[f"{wm.source}::{wm.source_key}"] = wm
-                        continue
-
-                    # 5) Persist
-                    try:
-                        inserted = self.store.upsert(record)
-                        if inserted:
-                            summary.new_records += 1
-                        else:
+                        # Dedup
+                        if not self.deduper.is_new(processed):
                             summary.duplicates += 1
-                    except Exception as e:
-                        summary.errors.append(f"upsert {record.id}: {e}")
+                            continue
 
-                    # 5b) Embed for hybrid search (v0.4) — best-effort, errors don't fail collect
-                    if self.embedder is not None and record.content:
+                        # Persist
                         try:
-                            vec = self._embed_text(record.content)
-                            if vec is not None:
-                                self.store.upsert_vector(record.id, vec)
+                            inserted = self.store.upsert(processed)
+                            if inserted:
+                                summary.new_records += 1
+                            else:
+                                summary.duplicates += 1
                         except Exception as e:
-                            summary.errors.append(f"embed {record.id}: {e}")
+                            summary.errors.append(f"upsert {processed.id}: {e}")
+
+                        # Embed
+                        if self.embedder is not None and processed.content:
+                            try:
+                                vec = self._embed_text(processed.content)
+                                if vec is not None:
+                                    self.store.upsert_vector(processed.id, vec)
+                            except Exception as e:
+                                summary.errors.append(f"embed {processed.id}: {e}")
 
                     watermarks[f"{wm.source}::{wm.source_key}"] = wm
             except Exception as e:

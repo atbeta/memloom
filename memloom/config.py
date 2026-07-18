@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 class PipelineConfig(BaseModel):
     data_root: str = "./data"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    steps: list[str] = Field(default_factory=list)  # v0.6: explicit step ordering
+    chunk_size: int = Field(default=8192, ge=1024)   # max chars per chunk
 
 
 class PrivacyConfig(BaseModel):

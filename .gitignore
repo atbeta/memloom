@@ -1,0 +1,26 @@
+# Build / env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv-cache/
+
+# Data — local store, do NOT commit
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Local config overrides
+config/memory-pipeline.yaml
+!config/memory-pipeline.yaml.example
+
+# Logs
+*.log
+data/cron.log
+
+# Editor
+.DS_Store
+.idea/
+.vscode/

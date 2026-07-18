@@ -1,0 +1,67 @@
+# memory-pipeline configuration
+# Copy this file to ./config/memory-pipeline.yaml or ~/.config/memory-pipeline/config.yaml
+
+pipeline:
+  data_root: ./data               # all raw records, indices, watermarks live here
+  log_level: INFO
+
+privacy:
+  enabled: true
+  strip_patterns:
+    # secrets that should never land in your local knowledge base
+    - "sk-[A-Za-z0-9_-]{20,}"
+    - "sk-ant-[A-Za-z0-9_-]{20,}"
+    - "ghp_[A-Za-z0-9]{36,}"
+    - "github_pat_[A-Za-z0-9_]{60,}"
+    - "AKIA[0-9A-Z]{16}"
+    - "xox[abprs]-[A-Za-z0-9-]{10,}"
+  redact_replacement: "[REDACTED]"
+
+# Transport hosts the pipeline can talk to.
+# v0.1: only 'local' is required. SSH host(s) optional — useful when this code
+# runs on a Mac Studio collecting from a home server.
+hosts:
+  - name: local
+    transport: local
+
+  # Example SSH host (currently Beta's only target is the home server 192.168.5.101).
+  # Uncomment and adapt when running from Mac Studio.
+  # - name: home-server
+  #   transport: ssh
+  #   ssh_host: 192.168.5.101
+  #   ssh_user: beta
+  #   ssh_key_file: ~/.ssh/id_ed25519
+
+# Which (agent_type, host) pairs to collect from.
+agents:
+  - type: openclaw
+    host: local
+    # OpenClaw workspace — defaults to ~/.openclaw/workspace if it exists.
+    options:
+      workspace: /home/node/.openclaw/workspace
+
+  - type: claude_code
+    host: local
+    options:
+      paths:
+        - ~/.claude/projects/**/*.jsonl
+
+  - type: codex
+    host: local
+    options:
+      paths:
+        - ~/.codex/sessions/**/*.jsonl
+
+  # Fallback: any *.jsonl / *.ndjson under these paths
+  - type: generic_jsonl
+    host: local
+    options:
+      paths:
+        - ~/some/other/agent/sessions/
+
+  # Example: collect Claude Code sessions from a remote host (when running on Mac Studio)
+  # - type: claude_code
+  #   host: home-server
+  #   options:
+  #     paths:
+  #       - "~/.claude/projects/**/*.jsonl"

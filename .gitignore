@@ -13,8 +13,8 @@ data/
 *.sqlite-shm
 
 # Local config overrides
-config/memory-pipeline.yaml
-!config/memory-pipeline.yaml.example
+config/memloom.yaml
+!config/memloom.yaml.example
 
 # Logs
 *.log

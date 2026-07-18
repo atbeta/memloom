@@ -232,7 +232,7 @@ def create_app(config: Config) -> FastAPI:
         score: float
         agent: str = ""
 
-    @app.get("/search", response_model=list[SearchResult])
+    @app.get("/search")
     def search(q: str = "", source: str = "", limit: int = 20, hybrid: bool = True):
         """Full-text or hybrid search across all collected records."""
         if not q.strip():
@@ -241,21 +241,24 @@ def create_app(config: Config) -> FastAPI:
         src = source if source else None
 
         if hybrid and embedder is not None:
-            query_vec = embedder.embed_one(q.strip())
-            results = store.hybrid_search(query=q.strip(), query_vec=query_vec, source=src, limit=limit)
+            try:
+                query_vec = embedder.embed_one(q.strip())
+                results = store.hybrid_search(query=q.strip(), query_vec=query_vec, source=src, limit=limit)
+            except Exception:
+                results = store.search(query=q.strip(), source=src, limit=limit)
         else:
             results = store.search(query=q.strip(), source=src, limit=limit)
 
         return [
-            SearchResult(
-                id=r.get("id", ""),
-                source=r.get("source", ""),
-                source_key=r.get("source_key", r.get("json_path", "")),
-                role=r.get("role", ""),
-                content=r.get("content", r.get("snip", ""))[:500],
-                score=float(r.get("rrf", r.get("rank", 0))),
-                agent=r.get("agent", ""),
-            )
+            {
+                "id": r.get("id", ""),
+                "source": r.get("source", ""),
+                "source_key": r.get("source_key", r.get("json_path", "")),
+                "role": r.get("role", ""),
+                "content": r.get("content", r.get("snip", ""))[:800],
+                "score": float(r.get("rrf", r.get("rank", 0))),
+                "agent": r.get("agent", ""),
+            }
             for r in results
         ]
 

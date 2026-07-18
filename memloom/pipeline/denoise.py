@@ -31,8 +31,20 @@ _JSON_BLOCK_RE = re.compile(r'\{[^{}]*"output"[^{}]*\}', re.DOTALL)
 _TOOL_HEADER_RE = re.compile(r'^\*\*`[^`]+`\*\*( → .*)?\n', re.MULTILINE)
 
 _EMPTY_TURN_RE = re.compile(
-    r'## (user|assistant)\n+\s*(\(empty\)|Hello!?\s*|你好[!！]?\s*|OK\b)\s*\n*(?=\n##|\Z)',
+    r'## (user|assistant)\n+\s*(\(empty\)|Hello!?\s*|你好[!！]?\s*|OK\b)?\s*\n*(?=\n##|\Z)',
     re.IGNORECASE | re.MULTILINE,
+)
+
+# Open WebUI / OpenClaw system template noise — follow-up question generation
+_SYSTEM_TEMPLATE_RE = re.compile(
+    r'### Task:\s*\n.*?Suggest.*?follow-up questions.*?\n(?:### Guidelines:.*?\n)?.*?(?=\n##|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Metadata header block that pollutes content: # conversation_turn\n\n- **source**:...
+_METADATA_HEADER_RE = re.compile(
+    r'^# conversation_turn\s*\n(?:- \*\*.*?\*\*:.*?\n)+',
+    re.MULTILINE,
 )
 
 
@@ -63,13 +75,19 @@ class Denoiser:
 
         original = content
 
-        # 1) Strip JSON tool output wrapping: {"output": "text", ...} → text
+        # 1) Strip JSON tool output wrapping
         content = self._unwrap_tool_outputs(content)
 
-        # 2) Remove empty/noise turns
+        # 2) Strip system template noise (follow-up question generation etc.)
+        content = _SYSTEM_TEMPLATE_RE.sub("", content)
+
+        # 3) Strip metadata header block at start of content
+        content = _METADATA_HEADER_RE.sub("", content)
+
+        # 4) Remove empty/noise turns
         content = _EMPTY_TURN_RE.sub("", content)
 
-        # 3) Collapse multiple blank lines
+        # 5) Collapse multiple blank lines
         content = re.sub(r'\n{4,}', '\n\n\n', content)
 
         changed = content.strip() != original.strip()

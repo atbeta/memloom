@@ -1,6 +1,6 @@
 [project]
 name = "memloom"
-version = "0.6.0"
+version = "0.6.1"
 description = "Weave your agents' memories into one searchable fabric — local-first, pluggable, raw-preserving."
 readme = "README.md"
 requires-python = ">=3.11"

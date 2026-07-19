@@ -282,7 +282,7 @@ def create_app(
                 "source_key": r.get("source_key", r.get("json_path", "")),
                 "role": r.get("role", ""),
                 "content": r.get("snippet", r.get("snip", ""))[:800],
-                "score": float(r.get("rrf", r.get("rank", 0))),
+                "score": float(r.get("rrf_score", r.get("rrf", r.get("rank", 0))) or 0),
                 "agent": r.get("agent", ""),
                 "path": r.get("json_path", ""),
             }
@@ -360,9 +360,12 @@ def create_app(
                     lines = []
                     for r in results:
                         snip = r.get("snippet", r.get("snip", ""))
+                        score = float(
+                            r.get("rrf_score", r.get("rrf", r.get("rank", 0))) or 0
+                        )
                         lines.append(
                             f"[{r.get('source','?')}] {snip}\n"
-                            f"  (id={r.get('id','')}, score={r.get('rrf', r.get('rank', 0)):.4f})"
+                            f"  (id={r.get('id','')}, score={score:.4f})"
                         )
                     text = "\n\n".join(lines) if lines else "(no results)"
                     result = {"content": [{"type": "text", "text": text}]}

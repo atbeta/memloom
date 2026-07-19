@@ -19,7 +19,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Build dashboard SPA
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+          test -f ../memloom/admin/static/index.html
+
+      - name: Build Python package
         run: |
           pip install build
           python -m build

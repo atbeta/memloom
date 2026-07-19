@@ -1,6 +1,6 @@
 [project]
 name = "memloom"
-version = "0.7.0"
+version = "0.8.0"
 description = "Weave your agents' memories into one searchable fabric — local-first, pluggable, raw-preserving."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -54,6 +54,12 @@ Issues = "https://github.com/atbeta/memloom/issues"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+# Include SPA build output even when gitignored (CI runs `npm run build` first).
+artifacts = [
+  "memloom/admin/static/**",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["memloom"]

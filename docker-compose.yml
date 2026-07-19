@@ -1,0 +1,58 @@
+# memloom — agent memory pipeline (example / lab template)
+# On 101: /opt/memloom/  (copy and adapt .env + config/)
+
+services:
+  memloom-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MEMLOOM_VERSION: "0.8.0"
+    image: memloom:0.8.0
+    container_name: memloom-server
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file: .env
+    working_dir: /app
+    ports:
+      - "8789:8789"
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    networks:
+      - edge_net
+      - librechat
+    extra_hosts:
+      - "bge3:192.168.5.13"
+    command: ["memloom", "serve", "--host", "0.0.0.0", "--port", "8789", "-c", "/config/memloom.yaml"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8789/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  memloom-collect:
+    image: memloom:0.8.0
+    container_name: memloom-collect
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file: .env
+    working_dir: /app
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    networks:
+      - edge_net
+      - librechat
+    extra_hosts:
+      - "bge3:192.168.5.13"
+    command: ["sh", "-c", "while true; do memloom collect -c /config/memloom.yaml; memloom push -c /config/memloom.yaml; sleep 300; done"]
+    depends_on:
+      - memloom-server
+
+networks:
+  edge_net:
+    external: true
+  librechat:
+    external: true

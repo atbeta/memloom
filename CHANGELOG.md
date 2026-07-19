@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-19
+
 ### Added
 - Admin dashboard Phase 1+2: Overview / Explorer / Pipeline / Settings SPA
 - `/api/admin/overview|runs|search|records/{id}` (Bearer auth)
@@ -11,6 +13,11 @@
 - Shared `memloom.ops.embed_backfill` used by CLI + admin
 - Optional `MEMLOOM_ADMIN_KEY` (falls back to `MEMLOOM_INGEST_KEY`)
 - Docs: `docs/dashboard.md`, design/plan under `docs/superpowers/`
+- Docker image installs published PyPI package (`memloom==0.8.0`)
+
+### Packaging
+- Wheel/sdist include built dashboard static assets
+- PyPI publish CI builds the SPA before `python -m build`
 
 ## [0.5.0] - 2026-07-19
 

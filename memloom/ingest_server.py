@@ -45,6 +45,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, ValidationError
 
+from . import __version__
 from .config import Config
 from .pipeline import Deduper, Denoiser, PrivacyFilter, tag_record
 from .records import MemoryRecord
@@ -122,9 +123,9 @@ def create_app(
     from .admin.state import AdminState
 
     app = FastAPI(
-        title="memloom-ingest",
-        version="0.1.0",
-        description="HTTP ingest endpoint for memloom. POST /ingest accepts records.",
+        title="memloom",
+        version=__version__,
+        description="memloom HTTP ingest + admin dashboard + MCP.",
     )
     store = RawStore(config.pipeline.data_root)
     privacy = (
@@ -306,7 +307,7 @@ def create_app(
         if method == "initialize":
             result = {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "memloom", "version": "0.7.0"},
+                "serverInfo": {"name": "memloom", "version": __version__},
                 "capabilities": {"tools": {}},
             }
         elif method == "tools/list":

@@ -50,9 +50,10 @@ class CollectorConfig(BaseModel):
         return raw
 
     @model_validator(mode="after")
-    def _resolve_api_key(self) -> CollectorConfig:
+    def _resolve_api_key_and_paths(self) -> CollectorConfig:
         if not self.api_key:
             self.api_key = os.environ.get("MEMLOOM_INGEST_KEY") or ""
+        self.state_dir = Path(self.state_dir).expanduser()
         return self
 
     @classmethod

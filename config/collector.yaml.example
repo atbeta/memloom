@@ -1,0 +1,29 @@
+# Hub-bound collector (run on the machine that has the data)
+#
+#   memloom collector run ./config/collector.yaml --once
+#   memloom collector run ./config/collector.yaml --loop --interval 300
+
+hub: http://192.168.5.101:8789/ingest
+# api_key: set via MEMLOOM_INGEST_KEY env (preferred) or inline
+batch_size: 500
+skip_embed: false
+state_dir: ~/.memloom-collector
+interval: 300
+
+sources:
+  # OpenCode SQLite (Mac / laptop typical)
+  # - type: opencode
+  #   db: ~/.local/share/opencode/opencode.db
+
+  # OpenClaw workspace markdown
+  # - type: openclaw
+  #   workspace: ~/.openclaw/workspace
+
+  # OpenClaw session trajectories
+  # - type: openclaw_session
+  #   session_dir: ~/.openclaw/agents/main/sessions
+
+  # LibreChat Mongo (same Docker network as librechat-mongodb)
+  # - type: librechat
+  #   mongo_uri: mongodb://librechat-mongodb:27017/
+  #   database: LibreChat

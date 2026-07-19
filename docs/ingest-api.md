@@ -138,31 +138,30 @@ save the watermark.
 
 ## Security notes
 
-- **Auth is required** for `/ingest`. The server refuses unauthenticated
-  requests with 401. There is no fallback or "open" mode.
-- **Bind address**: default `0.0.0.0` (listens on all interfaces). Use
-  `--host 127.0.0.1` for local-only. Or keep `0.0.0.0` and put a reverse
-  proxy with TLS in front.
-- **Key rotation**: set a new `MEMLOOM_INGEST_KEY` env var and restart
-  the server. Old key immediately stops working.
-- **Audit**: check the run history with `mp status` and look for recent
-  `run_id` entries. Each ingest call writes one.
+- **`MEMLOOM_INGEST_KEY`**: required for `POST /ingest` only.
+- **`MEMLOOM_READ_KEY`**: `/api/search` and `/mcp` (falls back to ingest key).
+- **`MEMLOOM_ADMIN_KEY`**: `/api/admin/*` (falls back to ingest key).
+- Unauthenticated ingest/read/admin → 401. No open mode.
+- **Bind address**: default `0.0.0.0`. Use `--host 127.0.0.1` for local-only.
+- **Key rotation**: change env and restart Hub.
 
-## Why push instead of pull?
+## Recommended client: Collector
 
-We considered the alternative (memloom SSHing into Mac Studio to read
-SQLite). Push wins for several reasons:
+Prefer [`memloom collector`](collector.md) on every machine that has data.
+It binds to this Hub with an ingest key and pushes incrementally.
 
-| | Pull (SSH+SQLite) | Push (HTTP) |
+```bash
+memloom collector run ~/.config/memloom/collector.yaml --once
+```
+
+## Why push instead of SSH pull?
+
+| | SSH pull (Legacy) | Collector push (recommended) |
 |---|---|---|
-| Mac Studio must run SSH | Yes | No |
-| memloom on Mac Studio | No | No |
-| Cron | On coder | On Mac Studio |
-| Firewalled network | Needs inbound | Just outbound |
-| Auth | SSH key | Bearer token (rotatable) |
-| Adds new sources | New adapter per source | Same `POST /ingest` |
+| Remote must run SSH server | Yes | No |
+| Install on data host | No | Yes (`memloom collector`) |
+| Cron / launchd | On Hub | On each data host |
+| Firewalled network | Needs inbound to data host | Outbound to Hub |
+| Auth | SSH key | `MEMLOOM_INGEST_KEY` |
 
-Use pull (adapters like `OpenClawSessionAdapter`, `LibreChatAdapter`)
-when the host is already networked and you want zero-touch collection.
-Use push (this API) when the host is closed off or the data producer
-wants full control over what gets sent.
+SSH transport remains in the codebase for emergency local-bypass / tests only.

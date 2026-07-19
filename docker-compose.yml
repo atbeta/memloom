@@ -1,5 +1,4 @@
-# memloom — agent memory pipeline (example / lab template)
-# On 101: /opt/memloom/  (copy and adapt .env + config/)
+# memloom — Hub + Collector (lab template for 101: /opt/memloom/)
 
 services:
   memloom-server:
@@ -7,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        MEMLOOM_VERSION: "0.8.0"
-    image: memloom:0.8.0
+        MEMLOOM_VERSION: "0.9.0"
+    image: memloom:0.9.0
     container_name: memloom-server
     restart: unless-stopped
     user: "1000:1000"
@@ -33,8 +32,41 @@ services:
       start_period: 10s
 
   memloom-collect:
-    image: memloom:0.8.0
+    image: memloom:0.9.0
     container_name: memloom-collect
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file: .env
+    working_dir: /app
+    volumes:
+      - ./config:/config:ro
+      # Mount real openclaw-coder paths (101 lab)
+      - /opt/openclaw-coder/workspace:/openclaw/workspace:ro
+      - /opt/openclaw-coder/config/agents/main/sessions:/openclaw/sessions:ro
+    networks:
+      - edge_net
+      - librechat
+    extra_hosts:
+      - "bge3:192.168.5.13"
+    # Hub-bound collector → POST ingest (not Runner direct-write)
+    command:
+      [
+        "memloom",
+        "collector",
+        "run",
+        "/config/collector.yaml",
+        "--loop",
+        "--interval",
+        "300",
+      ]
+    depends_on:
+      - memloom-server
+
+  # Optional Hub-side AnythingLLM mirror (not part of Collector)
+  memloom-push:
+    image: memloom:0.9.0
+    container_name: memloom-push
+    profiles: ["push"]
     restart: unless-stopped
     user: "1000:1000"
     env_file: .env
@@ -44,10 +76,12 @@ services:
       - ./config:/config:ro
     networks:
       - edge_net
-      - librechat
-    extra_hosts:
-      - "bge3:192.168.5.13"
-    command: ["sh", "-c", "while true; do memloom collect -c /config/memloom.yaml; memloom push -c /config/memloom.yaml; sleep 300; done"]
+    command:
+      [
+        "sh",
+        "-c",
+        "while true; do memloom push -c /config/memloom.yaml; sleep 600; done",
+      ]
     depends_on:
       - memloom-server
 

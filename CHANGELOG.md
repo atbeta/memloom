@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-19
+
+### Added
+- Hub + Collector architecture: `memloom collector run` binds to a Hub and POSTs `/ingest`
+- Collector adapters: `librechat` (Mongo), `openclaw` workspace markdown
+- Split Hub keys: `MEMLOOM_INGEST_KEY` / `MEMLOOM_READ_KEY` / `MEMLOOM_ADMIN_KEY`
+- Docs: `docs/collector.md`, hub-collector design spec, Mac/hz example configs
+
+### Changed
+- `memloom sync` is a deprecated alias of `memloom collector`
+- Search + MCP authenticate with read key (fallback ingest)
+- README recommends machine-local collectors over SSH pull
+
+### Legacy
+- `memloom collect` (Runner direct-write) and SSH transport remain for tests / emergency
+
 ## [0.8.0] - 2026-07-19
 
 ### Added

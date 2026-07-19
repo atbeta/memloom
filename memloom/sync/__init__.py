@@ -1,5 +1,4 @@
-"""memloom-sync: push local agent stores to a memloom ingest server.
+"""memloom-sync: legacy name for Hub-bound collectors (prefer memloom.collector).
 
-Unlike the collector adapters (PULL via Transport), sync adapters
-run on the machine where agent data lives and PUSH via HTTP ingest.
+Sync adapters run on the machine where agent data lives and PUSH via HTTP ingest.
 """

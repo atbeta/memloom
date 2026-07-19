@@ -416,12 +416,12 @@ def serve(
     console.print(f"[green]memloom server starting on http://{host}:{port}[/green]")
     console.print(f"  data_root: {cfg.pipeline.data_root}")
     console.print("  endpoints:")
-    console.print("    POST /ingest          (Bearer auth)")
+    console.print("    POST /ingest          (MEMLOOM_INGEST_KEY)")
     console.print("    GET  /health          (no auth)")
     console.print("    GET  /stats           (no auth)")
-    console.print("    GET  /api/search      (Bearer auth)")
-    console.print("    POST /mcp             (Bearer auth)")
-    console.print("    GET  /api/admin/*     (Bearer auth — dashboard)")
+    console.print("    GET  /api/search      (MEMLOOM_READ_KEY, fallback INGEST)")
+    console.print("    POST /mcp             (MEMLOOM_READ_KEY, fallback INGEST)")
+    console.print("    GET  /api/admin/*     (MEMLOOM_ADMIN_KEY, fallback INGEST)")
     console.print("    GET  /                (SPA if dashboard built)")
     uvicorn.run(app, host=host, port=port, reload=reload, log_level="info")
 
@@ -499,9 +499,11 @@ def _fmt_ts(ms: int) -> str:
     return _dt.datetime.fromtimestamp(ms / 1000).isoformat(timespec="seconds")
 
 
-# ── sync subcommand ──────────────────────────────────────────────────────────
+# ── collector (primary) + sync (deprecated alias) ────────────────────────────
+from .collector.cli import collector_app
 from .sync.cli import sync_app
 
+app.add_typer(collector_app)
 app.add_typer(sync_app)
 
 if __name__ == "__main__":

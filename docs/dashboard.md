@@ -8,6 +8,7 @@ Replaces AnythingLLM’s browse/ops surface — **no chat**.
 ```bash
 # Terminal A — API
 export MEMLOOM_INGEST_KEY=dev_key_change_me
+export MEMLOOM_ADMIN_KEY=dev_admin_key   # optional; falls back to ingest
 uv run memloom serve --config ./config/memloom.yaml --host 127.0.0.1 --port 8789
 
 # Terminal B — UI (proxies /api → :8789)
@@ -28,7 +29,15 @@ uv run memloom serve --config ./config/memloom.yaml --host 127.0.0.1 --port 8789
 # → http://127.0.0.1:8789/
 ```
 
-Optional: set `MEMLOOM_ADMIN_KEY` to use a key different from ingest.
+Keys:
+
+| Env | Used for |
+|-----|----------|
+| `MEMLOOM_INGEST_KEY` | Collectors → `POST /ingest` |
+| `MEMLOOM_READ_KEY` | MCP / HTTP search (fallback: ingest) |
+| `MEMLOOM_ADMIN_KEY` | Dashboard admin API (fallback: ingest) |
+
+Paste the **admin** key (or ingest if admin unset) into the dashboard login.
 
 ## Pages
 

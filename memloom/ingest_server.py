@@ -83,23 +83,18 @@ class HealthResponse(BaseModel):
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def _verify_bearer(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> None:
-    """FastAPI dependency: reject if the Bearer token doesn't match."""
+def _check_bearer(creds: HTTPAuthorizationCredentials | None, expected: str | None, missing_msg: str) -> None:
     if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="missing or invalid Authorization header",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    expected = os.environ.get("MEMLOOM_INGEST_KEY")
     if not expected:
-        # Server misconfig: no key set. Fail closed.
-        log.error("MEMLOOM_INGEST_KEY is not set in server env — refusing all requests")
+        log.error(missing_msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="server misconfiguration: no MEMLOOM_INGEST_KEY set",
+            detail="server misconfiguration: API key not set",
         )
     if not secrets.compare_digest(creds.credentials, expected):
         raise HTTPException(
@@ -107,6 +102,36 @@ def _verify_bearer(
             detail="invalid API key",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def _verify_ingest_bearer(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> None:
+    """POST /ingest — MEMLOOM_INGEST_KEY only."""
+    from .auth_keys import ingest_key
+
+    _check_bearer(
+        creds,
+        ingest_key(),
+        "MEMLOOM_INGEST_KEY is not set in server env — refusing ingest",
+    )
+
+
+def _verify_read_bearer(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> None:
+    """Search + MCP — MEMLOOM_READ_KEY (fallback INGEST)."""
+    from .auth_keys import read_key
+
+    _check_bearer(
+        creds,
+        read_key(),
+        "neither MEMLOOM_READ_KEY nor MEMLOOM_INGEST_KEY is set — refusing read/MCP",
+    )
+
+
+# Backward-compat alias (tests / older imports)
+_verify_bearer = _verify_ingest_bearer
 
 
 # ---------- App factory ----------
@@ -155,7 +180,7 @@ def create_app(
     @app.post("/ingest", response_model=IngestResponse, status_code=200)
     def ingest(
         payload: IngestRequest,
-        _auth: None = Depends(_verify_bearer),
+        _auth: None = Depends(_verify_ingest_bearer),
     ) -> IngestResponse:
         accepted = 0
         skipped = 0
@@ -233,7 +258,7 @@ def create_app(
         score: float
         agent: str = ""
 
-    @app.get("/api/search", dependencies=[Depends(_verify_bearer)])
+    @app.get("/api/search", dependencies=[Depends(_verify_read_bearer)])
     def search(q: str = "", source: str = "", limit: int = 20, hybrid: bool = True):
         """Full-text or hybrid search across all collected records."""
         if not q.strip():
@@ -297,7 +322,7 @@ def create_app(
         },
     ]
 
-    @app.post("/mcp", dependencies=[Depends(_verify_bearer)])
+    @app.post("/mcp", dependencies=[Depends(_verify_read_bearer)])
     def mcp_endpoint(req: dict):
         method = req.get("method", "")
         req_id = req.get("id")

@@ -16,14 +16,13 @@ The v0.1 design keeps everything raw — original files are copied (or reference
 to disk in their original form, with derived layers (facts, vector indices,
 graph relations) added on top later. You can always go back to the source.
 
-## v0.4 scope
+## v0.9 scope (Hub + Collector)
 
-* **Agents (collect)**: OpenClaw, Claude Code, Codex CLI, LibreChat, Generic JSONL
-* **Agents (sync/push)**: OpenCode, Kilo Code, Qoder, Antigravity brain — push local stores to HTTP ingest
-* **Hosts**: local + SSH
-* **Pipeline**: collect → privacy-filter → tag → dedup → persist
-* **Retrieval**: CLI `mp search` over SQLite FTS5 + vector hybrid search
-* **Ingest server**: FastAPI `POST /ingest` with Bearer auth, privacy filter, auto-embed
+* **Hub** (`memloom serve`): ingest → store → embed → search / MCP / dashboard
+* **Collector** (`memloom collector`): runs where data lives, pushes via ingest key
+* **Sources**: OpenClaw, LibreChat, OpenCode, Codex, Hermes, Kilo, Qoder, …
+* **Legacy**: `memloom collect` (local Runner) and SSH transport — not recommended
+* See [docs/collector.md](docs/collector.md) and [hub-collector design](docs/superpowers/specs/2026-07-19-hub-collector-design.md)
 
 ## Install
 
@@ -40,80 +39,51 @@ mp init-config ./config/memory-pipeline.yaml
 
 # 2. Edit it: pick which agents, which hosts
 
-# 3. Collect once
-mp collect
-
-# 4. Search
-mp search "memory pipeline"
-mp search --source openclaw "Beta preferences"
-
-# 5. Inspect a record
-mp inspect rec_abc123...
-
-# 6. Status
-mp status
-
-# 7. (Push mode) Sync local agent stores to ingest server
-mp sync run ~/.memloom-sync/config.yaml --once
-
-# 8. Dashboard (optional) — overview / search / runs
-#    see docs/dashboard.md
-cd dashboard && npm install && npm run build
+# 3. Start Hub
 export MEMLOOM_INGEST_KEY=...
+export MEMLOOM_READ_KEY=...    # optional; falls back to ingest
+export MEMLOOM_ADMIN_KEY=...   # optional; falls back to ingest
 uv run memloom serve --config ./config/memloom.yaml --host 127.0.0.1
-# → http://127.0.0.1:8789/
+
+# 4. On each machine with data — run a collector
+cp config/collector.yaml.example ~/.config/memloom/collector.yaml
+# edit hub + sources
+memloom collector run ~/.config/memloom/collector.yaml --once
+
+# 5. Search / dashboard
+mp search "memory pipeline"
+# http://127.0.0.1:8789/  (see docs/dashboard.md)
 ```
 
 ## Layout
 
 ```
-data/                          # data_root from config
-  raw/<source>/<key>.json      # canonical record
-  raw/<source>/<key>.md        # human-readable mirror
-  index.sqlite                 # FTS5 over all records
-  runs.sqlite                  # collector run history
-  watermarks.json              # incremental cursors
+data/                          # Hub data_root
+  raw/<source>/<key>.json
+  raw/<source>/<key>.md
+  index.sqlite
+  runs.sqlite
 ```
 
-## Sync config (push mode)
+## Collector config
 
 ```yaml
-# ~/.memloom-sync/config.yaml
-endpoint: http://192.168.5.101:8789/ingest
-api_key: memloom_ingest_xxxxx
-batch_size: 500
-
+# see config/collector.yaml.example and docs/collector.md
+hub: http://192.168.5.101:8789/ingest
 sources:
   - type: opencode
     db: ~/.local/share/opencode/opencode.db
-  - type: kilocode
-    session_dir: ~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/tasks
 ```
-
-## Cron
-
-`scripts/install-cron.sh` registers `mp collect` every 5 minutes in the user's crontab.
-Idempotent — re-running picks up only what changed.
 
 ## Architecture
 
 ```
-Agents ──► Collectors ──► Pipeline ──► RawStore
-                                  │
-                                  ├──► sqlite-vec hybrid search
-                                  ├──► HTTP ingest + MCP (/mcp)
-                                  └──► Admin dashboard (/api/admin + SPA)
+Mac/hz/101 Collectors ──POST /ingest──► Hub (store + embed + MCP + dashboard)
 ```
 
-* **Collectors**: one per agent type. They know the agent's on-disk format and
-  yield `MemoryRecord`s. They don't know about persistence.
-* **Transport**: pluggable. `LocalTransport` for local files, `SSHTransport`
-  (Fabric) for remote. Collectors ask the transport to read/list — they don't
-  care which one.
-* **Pipeline**: pure transforms on records — privacy filter, tag inference,
-  deduper. Composable.
-* **RawStore**: append-only-ish writes keyed by content hash. Three artifacts
-  per record (json + md + sqlite row). FTS5 index for retrieval.
+* **Hub**: authoritative pipeline and retrieval.
+* **Collector**: Hub-bound; filesystem/DB adapters; watermarks; batch ingest.
+* **Legacy**: `memloom collect` + SSH pull — prefer a collector on the data host.
 
 ## Adding a new agent
 

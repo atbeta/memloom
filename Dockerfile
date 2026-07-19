@@ -2,7 +2,7 @@
 # Build: docker build -t memloom:latest .
 FROM python:3.11-slim
 
-ARG MEMLOOM_VERSION=0.8.0
+ARG MEMLOOM_VERSION=0.9.0
 ARG UID=1000
 
 RUN pip install --no-cache-dir uv \

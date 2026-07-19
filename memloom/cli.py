@@ -88,6 +88,7 @@ def embed(
     """
     cfg = _load_config_or_die(config)
     from .embed import EmbedConfig, Embedder
+    from .ops import embed_backfill
     emb_cfg = getattr(cfg, "embed", None)
     if emb_cfg is None or not emb_cfg.enabled:
         console.print("[red]embed.enabled=true required in config.[/red]")
@@ -105,80 +106,15 @@ def embed(
         console.print(f"[red]embedder unreachable at {emb_cfg.base_url}[/red]")
         raise typer.Exit(2)
 
-    # Read all records from raw/ dir
-    import json
-    from .records import MemoryRecord
-    raw_root = Path(store.root) / "raw"
-    if not raw_root.exists():
-        console.print("[yellow]No records to embed.[/yellow]")
-        raise typer.Exit(0)
-    files = list(raw_root.rglob("*.json"))
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-
-    embedded = 0
-    skipped = 0
-    errors: list[str] = []
-    batch_texts: list[str] = []
-    batch_ids: list[str] = []
-    BATCH = batch_size
-
-    def flush():
-        nonlocal embedded, errors
-        if not batch_texts:
-            return
-        try:
-            vecs = embedder.embed_batch(batch_texts)
-        except Exception as e:
-            errors.append(f"batch embed failed: {e}")
-            batch_texts.clear()
-            batch_ids.clear()
-            return
-        for rid, vec in zip(batch_ids, vecs):
-            try:
-                store.upsert_vector(rid, vec)
-                embedded += 1
-            except KeyError:
-                # Record was deleted between scan and embed
-                pass
-            except Exception as e:
-                errors.append(f"upsert_vector {rid}: {e}")
-        batch_texts.clear()
-        batch_ids.clear()
-
-    for p in files:
-        if limit and embedded + len(batch_texts) >= limit:
-            break
-        try:
-            d = json.loads(p.read_text(encoding="utf-8"))
-            rec = MemoryRecord.from_dict(d)
-        except Exception:
-            continue
-        if rec.role.startswith("_"):
-            continue
-        if source and rec.source != source:
-            continue
-        if not rec.content:
-            continue
-        # Skip if already vectorized (unless --force)
-        if not force:
-            with store._connect(store.index_path) as c:
-                rowid = store._record_rowid(c, rec.id)
-                if rowid is not None:
-                    exists = c.execute(
-                        "SELECT 1 FROM records_vec WHERE rowid=?", (rowid,)
-                    ).fetchone()
-                    if exists:
-                        skipped += 1
-                        continue
-        batch_texts.append(rec.content)
-        batch_ids.append(rec.id)
-        if len(batch_texts) >= BATCH:
-            flush()
-    flush()
-
-    console.print(f"[cyan]Embedded: {embedded}  skipped: {skipped}  errors: {len(errors)}[/cyan]")
-    if errors:
-        for e in errors[:5]:
+    result = embed_backfill(
+        store, embedder, source=source, limit=limit, force=force, batch_size=batch_size,
+    )
+    console.print(
+        f"[cyan]Embedded: {result['embedded']}  skipped: {result['skipped']}  "
+        f"errors: {len(result['errors'])}[/cyan]"
+    )
+    if result["errors"]:
+        for e in result["errors"][:5]:
             console.print(f"  [red]{e}[/red]")
 
 
@@ -472,9 +408,11 @@ def serve(
         raise typer.Exit(1)
 
     cfg = _load_config_or_die(config)
+    from .config import find_config
     from .ingest_server import create_app
     import uvicorn
-    app = create_app(cfg)
+    cfg_path = find_config(config)
+    app = create_app(cfg, config_path=cfg_path)
     console.print(f"[green]memloom server starting on http://{host}:{port}[/green]")
     console.print(f"  data_root: {cfg.pipeline.data_root}")
     console.print("  endpoints:")

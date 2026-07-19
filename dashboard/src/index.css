@@ -46,3 +46,18 @@
     font: inherit;
   }
 }
+
+@layer components {
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .field:focus {
+    border-color: var(--color-accent);
+  }
+}

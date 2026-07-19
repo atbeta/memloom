@@ -134,8 +134,11 @@ _DEFAULT_STRIP_PATTERNS = [
 # ---------- Loader --------------------------------------------------------
 
 DEFAULT_CONFIG_PATHS = [
+    "./config/memloom.yaml",
+    "./memloom.yaml",
     "./config/memory-pipeline.yaml",
     "./memory-pipeline.yaml",
+    "~/.config/memloom/config.yaml",
     "~/.config/memory-pipeline/config.yaml",
 ]
 

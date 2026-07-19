@@ -98,3 +98,96 @@ def test_admin_key_override(cfg_and_key):
         "/api/admin/overview",
         headers={"Authorization": f"Bearer {admin_key}"},
     ).status_code == 200
+
+
+def test_admin_settings_get_and_patch(cfg_and_key, tmp_path):
+    from pathlib import Path
+
+    import yaml
+
+    cfg, key = cfg_and_key
+    cfg_path = tmp_path / "memloom.yaml"
+    cfg_path.write_text(
+        yaml.safe_dump(cfg.model_dump(mode="python"), sort_keys=False),
+        encoding="utf-8",
+    )
+    # Point data_root at the same temp store used by cfg
+    app = create_app(cfg, config_path=cfg_path)
+    c = TestClient(app)
+    hdr = {"Authorization": f"Bearer {key}"}
+
+    g = c.get("/api/admin/settings", headers=hdr)
+    assert g.status_code == 200
+    body = g.json()
+    assert body["writable"] is True
+    assert body["embed"]["api_key"] in ("", "••••••••")
+
+    p = c.patch(
+        "/api/admin/settings",
+        headers=hdr,
+        json={"pipeline": {"log_level": "DEBUG"}, "denoise": {"enabled": False}},
+    )
+    assert p.status_code == 200
+    assert p.json()["pipeline"]["log_level"] == "DEBUG"
+    assert p.json()["denoise"]["enabled"] is False
+    saved = yaml.safe_load(Path(cfg_path).read_text(encoding="utf-8"))
+    assert saved["pipeline"]["log_level"] == "DEBUG"
+    assert cfg_path.with_suffix(cfg_path.suffix + ".bak").exists()
+
+
+def test_admin_settings_patch_requires_path(client):
+    c, key = client
+    r = c.patch(
+        "/api/admin/settings",
+        headers={"Authorization": f"Bearer {key}"},
+        json={"denoise": {"enabled": False}},
+    )
+    assert r.status_code == 400
+
+
+def test_admin_collect_action(client):
+    c, key = client
+    r = c.post(
+        "/api/admin/actions/collect",
+        headers={"Authorization": f"Bearer {key}"},
+        json={},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert isinstance(body["runs"], list)
+
+
+def test_admin_quarantine_roundtrip(client, cfg_and_key):
+    c, key = client
+    cfg, _ = cfg_and_key
+    store = RawStore(cfg.pipeline.data_root)
+    rec = MemoryRecord(
+        source="opencode",
+        source_key="q1",
+        content="quarantine me please now",
+        role="note",
+    )
+    store.upsert(rec)
+    hdr = {"Authorization": f"Bearer {key}"}
+
+    add = c.post(
+        "/api/admin/quarantine/add",
+        headers=hdr,
+        json={"record_ids": [rec.id], "reason": "test"},
+    )
+    assert add.status_code == 200
+    assert rec.id in add.json()["moved"]
+    assert store.get_record(rec.id) is None
+
+    listed = c.get("/api/admin/quarantine", headers=hdr)
+    assert listed.status_code == 200
+    assert any(x.get("id") == rec.id for x in listed.json())
+
+    restore = c.post(
+        "/api/admin/quarantine/restore",
+        headers=hdr,
+        json={"record_ids": [rec.id]},
+    )
+    assert restore.status_code == 200
+    assert rec.id in restore.json()["moved"]

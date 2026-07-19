@@ -24,6 +24,7 @@ data/cron.log
 .DS_Store
 .idea/
 .vscode/
+.cursor/
 
 # Tool caches
 .pytest_cache/

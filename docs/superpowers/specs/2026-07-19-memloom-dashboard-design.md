@@ -1,7 +1,7 @@
 # Memloom Dashboard Design
 
 **Date:** 2026-07-19  
-**Status:** Approved (approach 1; Phase 1 first)
+**Status:** Implemented (Phase 1 + Phase 2)
 
 ## Goal
 
@@ -95,8 +95,8 @@ Secrets (api_key) write-only / masked on read. Full YAML remains the escape hatc
 - Store unit test for `get_record`
 - Manual smoke: serve + Vite proxy
 
-## Open decisions deferred to Phase 2
+## Phase 2 decisions (locked)
 
-- Whether collect runs sync in-request or background job
-- Config write atomicity / backup of YAML before save
-- Deprecating AnythingLLM push UI (CLI can remain)
+- Collect / embed run **synchronously** in the HTTP request (LAN admin; keep batches modest)
+- Config writes are atomic (`.tmp` → replace) with a `.yaml.bak` of the previous file
+- AnythingLLM push stays CLI-only (no dashboard UI)

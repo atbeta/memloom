@@ -5,6 +5,7 @@ const links = [
   { to: '/', label: 'Overview', end: true },
   { to: '/explorer', label: 'Explorer' },
   { to: '/pipeline', label: 'Pipeline' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export function Shell() {

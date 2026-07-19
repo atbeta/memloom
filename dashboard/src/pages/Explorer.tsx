@@ -1,5 +1,12 @@
-import { useState, type FormEvent } from 'react'
-import { ApiError, apiGet, type RecordDetail, type SearchHit } from '@/lib/api'
+import { useEffect, useState, type FormEvent } from 'react'
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  type QuarantineItem,
+  type RecordDetail,
+  type SearchHit,
+} from '@/lib/api'
 import { formatTs } from '@/lib/format'
 import { StatusLine } from '@/components/StatusLine'
 
@@ -13,6 +20,21 @@ export default function Explorer() {
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [quarantine, setQuarantine] = useState<QuarantineItem[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  async function loadQuarantine() {
+    try {
+      setQuarantine(await apiGet<QuarantineItem[]>('/api/admin/quarantine'))
+    } catch {
+      /* ignore list errors in this panel */
+    }
+  }
+
+  useEffect(() => {
+    void loadQuarantine()
+  }, [])
 
   async function onSearch(e?: FormEvent) {
     e?.preventDefault()
@@ -58,7 +80,55 @@ export default function Explorer() {
     }
   }
 
+  async function quarantineSelected() {
+    if (!selected) return
+    setBusyId(selected.id)
+    setNotice(null)
+    setError(null)
+    try {
+      const body = await apiSend<{ moved: string[] }>('POST', '/api/admin/quarantine/add', {
+        record_ids: [selected.id],
+        reason: 'dashboard',
+      })
+      setNotice(`Quarantined ${body.moved.length} record(s).`)
+      setHits((prev) => prev.filter((h) => h.id !== selected.id))
+      setSelected(null)
+      await loadQuarantine()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        window.location.reload()
+        return
+      }
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function restoreQuarantined(id: string) {
+    setBusyId(id)
+    setNotice(null)
+    setError(null)
+    try {
+      const body = await apiSend<{ moved: string[] }>('POST', '/api/admin/quarantine/restore', {
+        record_ids: [id],
+      })
+      setNotice(`Restored ${body.moved.length} record(s).`)
+      await loadQuarantine()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        window.location.reload()
+        return
+      }
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
+    <div className="space-y-4">
+      {notice ? <p className="font-mono text-sm text-accent">{notice}</p> : null}
     <div className="flex min-h-[70vh] flex-col gap-4 lg:flex-row">
       <section className="flex w-full flex-col lg:w-[42%]">
         <form onSubmit={onSearch} className="space-y-2 border border-line bg-panel p-3">
@@ -149,7 +219,7 @@ export default function Explorer() {
                   ) : null}
                 </p>
               </div>
-              <div className="flex gap-1 text-sm">
+              <div className="flex flex-wrap gap-1 text-sm">
                 <button
                   type="button"
                   onClick={() => setView('markdown')}
@@ -172,6 +242,14 @@ export default function Explorer() {
                 >
                   JSON
                 </button>
+                <button
+                  type="button"
+                  onClick={() => void quarantineSelected()}
+                  disabled={busyId === selected.id}
+                  className="px-2 py-1 text-danger hover:bg-surface disabled:opacity-40"
+                >
+                  Quarantine
+                </button>
               </div>
             </div>
             <pre className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">
@@ -181,6 +259,33 @@ export default function Explorer() {
             </pre>
           </>
         ) : null}
+      </section>
+    </div>
+
+      <section className="border border-line bg-panel p-3">
+        <h2 className="text-sm font-medium text-muted">Quarantine</h2>
+        {quarantine.length === 0 ? (
+          <p className="mt-2 font-mono text-sm text-muted">Empty.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {quarantine.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-xs text-accent">{item.source}</p>
+                  <p className="truncate font-mono text-[11px] text-muted">{item.id}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void restoreQuarantined(item.id)}
+                  disabled={busyId === item.id}
+                  className="shrink-0 px-2 py-1 text-accent hover:bg-accent-soft disabled:opacity-40"
+                >
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   )

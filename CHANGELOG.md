@@ -3,9 +3,12 @@
 ## [Unreleased]
 
 ### Added
-- Admin dashboard (Phase 1): Overview / Explorer / Pipeline SPA
+- Admin dashboard Phase 1+2: Overview / Explorer / Pipeline / Settings SPA
 - `/api/admin/overview|runs|search|records/{id}` (Bearer auth)
+- `/api/admin/settings` GET/PATCH (common knobs; secrets masked)
+- `/api/admin/actions/collect|embed` and quarantine list/add/restore
 - `RawStore.get_record()` for id → JSON/Markdown lookup
+- Shared `memloom.ops.embed_backfill` used by CLI + admin
 - Optional `MEMLOOM_ADMIN_KEY` (falls back to `MEMLOOM_INGEST_KEY`)
 - Docs: `docs/dashboard.md`, design/plan under `docs/superpowers/`
 

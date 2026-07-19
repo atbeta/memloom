@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, apiGet, type Overview as OverviewData } from '@/lib/api'
+import { ApiError, apiGet, apiSend, type Overview as OverviewData } from '@/lib/api'
 import { formatTs } from '@/lib/format'
 import { StatusLine } from '@/components/StatusLine'
 
@@ -8,34 +8,56 @@ export default function Overview() {
   const [data, setData] = useState<OverviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [embedding, setEmbedding] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const body = await apiGet<OverviewData>('/api/admin/overview')
-        if (!cancelled) {
-          setData(body)
-          setError(null)
-        }
-      } catch (e) {
-        if (!cancelled) {
-          if (e instanceof ApiError && e.status === 401) {
-            window.location.reload()
-            return
-          }
-          setError(e instanceof Error ? e.message : String(e))
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const body = await apiGet<OverviewData>('/api/admin/overview')
+      setData(body)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        window.location.reload()
+        return
       }
-    })()
-    return () => {
-      cancelled = true
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  if (loading || error || !data) {
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function runEmbed() {
+    setEmbedding(true)
+    setNotice(null)
+    setError(null)
+    try {
+      const body = await apiSend<{ ok: boolean; embedded: number; skipped: number; errors: string[] }>(
+        'POST',
+        '/api/admin/actions/embed',
+        { limit: 200, force: false },
+      )
+      setNotice(
+        `Embed finished — embedded ${body.embedded}, skipped ${body.skipped}, errors ${body.errors.length}.`,
+      )
+      await load()
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        window.location.reload()
+        return
+      }
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEmbedding(false)
+    }
+  }
+
+  if (loading || !data) {
     return <StatusLine loading={loading} error={error} />
   }
 
@@ -43,8 +65,22 @@ export default function Overview() {
 
   return (
     <div className="space-y-6">
+      {error ? <StatusLine error={error} /> : null}
+      {notice ? <p className="font-mono text-sm text-accent">{notice}</p> : null}
+
       <section>
-        <h2 className="text-sm font-medium text-muted">Store</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-sm font-medium text-muted">Store</h2>
+          <button
+            type="button"
+            onClick={() => void runEmbed()}
+            disabled={embedding || !data.embed_enabled}
+            className="bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-40"
+            title={data.embed_enabled ? 'Backfill up to 200 missing vectors' : 'Enable embed in Settings'}
+          >
+            {embedding ? 'Embedding…' : 'Embed backfill'}
+          </button>
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="records" value={String(data.total)} />
           <Stat label="vectors" value={String(data.vectors)} />

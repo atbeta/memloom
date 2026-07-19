@@ -34,11 +34,13 @@ Optional: set `MEMLOOM_ADMIN_KEY` to use a key different from ingest.
 
 | Route | Purpose |
 |---|---|
-| `/` | Totals, by-source, recent runs |
-| `/explorer` | FTS5 / hybrid search + raw JSON/Markdown |
-| `/pipeline` | Collector run history |
+| `/` | Totals, by-source, recent runs, embed backfill |
+| `/explorer` | FTS5 / hybrid search + raw JSON/Markdown + quarantine |
+| `/pipeline` | Collector run history + **Run collect** |
+| `/settings` | Common config form (YAML still escape hatch) |
 
-## Phase 2 (not yet)
+## Notes
 
-Settings forms, trigger collect/embed/quarantine — see
-`docs/superpowers/specs/2026-07-19-memloom-dashboard-design.md`.
+- Start serve with `--config` so Settings can write (creates `.yaml.bak` on save).
+- Changing `data_root` requires restarting the server.
+- Secrets (`embed.api_key`) are never returned in cleartext; leave blank to keep.

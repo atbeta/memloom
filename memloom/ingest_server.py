@@ -45,11 +45,9 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, ValidationError
 
-from .config import Config, load_config
-from .embed import EmbedConfig, Embedder
+from .config import Config
 from .pipeline import Deduper, Denoiser, PrivacyFilter, tag_record
 from .records import MemoryRecord
-from .runner import Runner
 from .store import RawStore
 
 
@@ -113,9 +111,16 @@ def _verify_bearer(
 # ---------- App factory ----------
 
 
-def create_app(config: Config) -> FastAPI:
+def create_app(
+    config: Config,
+    config_path: str | os.PathLike[str] | None = None,
+) -> FastAPI:
     """Build the FastAPI app. The data_root and api_key are taken from the
     server's environment (MEMLOOM_INGEST_KEY)."""
+    from pathlib import Path
+
+    from .admin.state import AdminState
+
     app = FastAPI(
         title="memloom-ingest",
         version="0.1.0",
@@ -131,25 +136,20 @@ def create_app(config: Config) -> FastAPI:
     )
     denoiser = Denoiser() if getattr(config, "denoise", None) and config.denoise.enabled else None
     deduper = Deduper()
-    embedder: Embedder | None = None
-    if (
-        getattr(config, "embed", None)
-        and config.embed.enabled
-        and not getattr(config, "_skip_embed_for_test", False)
-    ):
-        try:
-            embedder = Embedder(EmbedConfig(
-                base_url=config.embed.base_url,
-                api_key=config.embed.api_key,
-                model=config.embed.model,
-                dimension=config.embed.dimension,
-                batch_size=config.embed.batch_size,
-                timeout=config.embed.timeout,
-                max_retries=config.embed.max_retries,
-                enabled=True,
-            ))
-        except Exception as e:
-            log.warning("embedder init failed: %s", e)
+    admin_state = AdminState(
+        config=config,
+        store=store,
+        config_path=Path(config_path).expanduser() if config_path else None,
+    )
+    if not getattr(config, "_skip_embed_for_test", False):
+        admin_state.rebuild_embedder()
+        if (
+            getattr(config, "embed", None)
+            and config.embed.enabled
+            and admin_state.embedder is None
+        ):
+            log.warning("embedder init failed or unavailable")
+    embedder = admin_state.embedder
 
     @app.post("/ingest", response_model=IngestResponse, status_code=200)
     def ingest(
@@ -356,7 +356,7 @@ def create_app(config: Config) -> FastAPI:
     from .admin.router import build_admin_router
     from .admin.static import mount_spa
 
-    app.include_router(build_admin_router(store, config, embedder))
+    app.include_router(build_admin_router(admin_state))
     mount_spa(app)
 
     return app

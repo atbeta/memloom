@@ -184,6 +184,35 @@ class RawStore:
             row = c.execute("SELECT 1 FROM records WHERE id=?", (record_id,)).fetchone()
             return row is not None
 
+    def _resolve_artifact(self, stored: str, *, raw_ref: str = "", kind: str = "json") -> Path:
+        """Resolve a stored json/md path, tolerating relocated data_root.
+
+        Older indexes may keep absolute paths from another host (e.g.
+        ``/home/node/.../data/raw/...``). Prefer ``raw_ref`` under the current
+        root, then basename under ``raw/<source>/``.
+        """
+        p = Path(stored)
+        if p.is_file():
+            return p
+        if raw_ref:
+            ref = raw_ref
+            if kind == "md" and ref.endswith(".json"):
+                ref = ref[: -len(".json")] + ".md"
+            alt = (self.root / ref).resolve()
+            if alt.is_file():
+                return alt
+        # basename fallback: .../raw/<source>/<file>
+        try:
+            # stored may be absolute from another machine; keep last two parts
+            parts = p.parts
+            if len(parts) >= 2:
+                alt2 = (self.raw_dir / parts[-2] / parts[-1]).resolve()
+                if alt2.is_file():
+                    return alt2
+        except (OSError, ValueError):
+            pass
+        return p
+
     def get_record(self, record_id: str) -> dict | None:
         """Load a record by id from the index + on-disk JSON/Markdown.
 
@@ -193,20 +222,27 @@ class RawStore:
         with self._connect(self.index_path) as c:
             row = c.execute(
                 """SELECT id, source, source_key, agent, project, role,
-                          captured_at, occurred_at, json_path, md_path
+                          captured_at, occurred_at, json_path, md_path, raw_ref
                    FROM records WHERE id=?""",
                 (record_id,),
             ).fetchone()
         if not row:
             return None
-        json_path = Path(row[8])
-        md_path = Path(row[9])
+        raw_ref = row[10] or ""
+        json_path = self._resolve_artifact(row[8], raw_ref=raw_ref, kind="json")
+        md_path = self._resolve_artifact(row[9], raw_ref=raw_ref, kind="md")
         record_data: dict = {}
         markdown = ""
         if json_path.is_file():
             record_data = json.loads(json_path.read_text(encoding="utf-8"))
         if md_path.is_file():
             markdown = md_path.read_text(encoding="utf-8")
+        elif record_data.get("content"):
+            # JSON present but md mirror missing/unreadable — synthesize for UI
+            try:
+                markdown = MemoryRecord.from_dict(record_data).to_markdown()
+            except Exception:
+                markdown = str(record_data.get("content") or "")
         return {
             "id": row[0],
             "source": row[1],
@@ -221,6 +257,32 @@ class RawStore:
             "record": record_data,
             "markdown": markdown,
         }
+
+    def repair_artifact_paths(self) -> dict[str, int]:
+        """Rewrite json_path/md_path to live under the current data_root.
+
+        Returns counts: ``{"checked": n, "updated": n, "missing": n}``.
+        """
+        checked = updated = missing = 0
+        with self._connect(self.index_path) as c:
+            rows = c.execute(
+                "SELECT id, json_path, md_path, raw_ref FROM records"
+            ).fetchall()
+            for rid, jp, mp, raw_ref in rows:
+                checked += 1
+                new_jp = self._resolve_artifact(jp or "", raw_ref=raw_ref or "", kind="json")
+                new_mp = self._resolve_artifact(mp or "", raw_ref=raw_ref or "", kind="md")
+                if not new_jp.is_file():
+                    missing += 1
+                    continue
+                if str(new_jp) != (jp or "") or str(new_mp) != (mp or ""):
+                    c.execute(
+                        "UPDATE records SET json_path=?, md_path=? WHERE id=?",
+                        (str(new_jp), str(new_mp), rid),
+                    )
+                    updated += 1
+            c.commit()
+        return {"checked": checked, "updated": updated, "missing": missing}
 
     def _record_rowid(self, c: sqlite3.Connection, record_id: str) -> int | None:
         """Get the integer rowid of a record (for joining with records_vec)."""

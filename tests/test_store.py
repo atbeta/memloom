@@ -65,3 +65,51 @@ def test_get_record_roundtrip(tmp_path):
     assert got["record"]["content"] == "hello admin"
     assert "hello admin" in got["markdown"]
     assert store.get_record("rec_nonexistent") is None
+
+
+def test_get_record_resolves_relocated_absolute_paths(tmp_path):
+    """Index may keep absolute paths from another host; resolve via raw_ref."""
+    store = RawStore(tmp_path)
+    rec = MemoryRecord(
+        source="openclaw_session",
+        source_key="sess#turn1",
+        content="relocated content",
+        role="conversation_turn",
+    )
+    store.upsert(rec)
+    stale_json = "/home/node/old-machine/data/raw/openclaw_session/sess_turn1.json"
+    stale_md = "/home/node/old-machine/data/raw/openclaw_session/sess_turn1.md"
+    with store._connect(store.index_path) as c:
+        c.execute(
+            "UPDATE records SET json_path=?, md_path=? WHERE id=?",
+            (stale_json, stale_md, rec.id),
+        )
+        c.commit()
+    got = store.get_record(rec.id)
+    assert got is not None
+    assert got["record"]["content"] == "relocated content"
+    assert "relocated content" in got["markdown"]
+    assert got["json_path"].startswith(str(tmp_path))
+
+
+def test_repair_artifact_paths(tmp_path):
+    from pathlib import Path
+
+    store = RawStore(tmp_path)
+    rec = MemoryRecord(source="s", source_key="k", content="x", role="note")
+    store.upsert(rec)
+    with store._connect(store.index_path) as c:
+        c.execute(
+            "UPDATE records SET json_path=?, md_path=? WHERE id=?",
+            ("/old/root/data/raw/s/k.json", "/old/root/data/raw/s/k.md", rec.id),
+        )
+        c.commit()
+    stats = store.repair_artifact_paths()
+    assert stats["updated"] == 1
+    with store._connect(store.index_path) as c:
+        jp, mp = c.execute(
+            "SELECT json_path, md_path FROM records WHERE id=?", (rec.id,)
+        ).fetchone()
+    assert jp.startswith(str(tmp_path))
+    assert Path(jp).is_file()
+    assert Path(mp).is_file()

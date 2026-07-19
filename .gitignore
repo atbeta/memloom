@@ -1,34 +1,39 @@
-
-!config/memloom.yaml.example
-!memloom/admin/static/.gitkeep
 # Build / env
-# Dashboard build output (keep folder via .gitkeep)
-# Data — local store, do NOT commit
-# Editor
-# Local config overrides
-# Logs
-# Tool caches
-*.egg-info/
-*.log
+__pycache__/
 *.py[cod]
+*.egg-info/
+.venv/
+.uv-cache/
+dist/
+
+# Data — local store, do NOT commit
+data/
 *.sqlite
 *.sqlite-journal
-*.sqlite-shm
 *.sqlite-wal
+*.sqlite-shm
+
+# Local config overrides
+config/memloom.yaml
+!config/memloom.yaml.example
+
+# Logs
+*.log
+data/cron.log
+
+# Editor
 .DS_Store
-.cursor/
 .idea/
-.ingest-key
+.vscode/
+.cursor/
+
+# Tool caches
 .pytest_cache/
 .ruff_cache/
-.uv-cache/
-.venv/
-.vscode/
-__pycache__/
-config/memloom.yaml
-dashboard/dist/
-dashboard/node_modules/
-data/
-data/cron.log
-dist/
+.ingest-key
+
+# Dashboard build output (keep folder via .gitkeep)
 memloom/admin/static/**
+!memloom/admin/static/.gitkeep
+dashboard/node_modules/
+dashboard/dist/

@@ -475,12 +475,16 @@ def serve(
     from .ingest_server import create_app
     import uvicorn
     app = create_app(cfg)
-    console.print(f"[green]memloom-ingest server starting on http://{host}:{port}[/green]")
+    console.print(f"[green]memloom server starting on http://{host}:{port}[/green]")
     console.print(f"  data_root: {cfg.pipeline.data_root}")
     console.print("  endpoints:")
-    console.print("    POST /ingest   (Bearer auth)")
-    console.print("    GET  /health   (no auth)")
-    console.print("    GET  /stats    (no auth)")
+    console.print("    POST /ingest          (Bearer auth)")
+    console.print("    GET  /health          (no auth)")
+    console.print("    GET  /stats           (no auth)")
+    console.print("    GET  /api/search      (Bearer auth)")
+    console.print("    POST /mcp             (Bearer auth)")
+    console.print("    GET  /api/admin/*     (Bearer auth — dashboard)")
+    console.print("    GET  /                (SPA if dashboard built)")
     uvicorn.run(app, host=host, port=port, reload=reload, log_level="info")
 
 

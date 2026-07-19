@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Admin dashboard (Phase 1): Overview / Explorer / Pipeline SPA
+- `/api/admin/overview|runs|search|records/{id}` (Bearer auth)
+- `RawStore.get_record()` for id → JSON/Markdown lookup
+- Optional `MEMLOOM_ADMIN_KEY` (falls back to `MEMLOOM_INGEST_KEY`)
+- Docs: `docs/dashboard.md`, design/plan under `docs/superpowers/`
+
 ## [0.5.0] - 2026-07-19
 
 ### Added

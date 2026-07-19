@@ -352,6 +352,13 @@ def create_app(config: Config) -> FastAPI:
             response["result"] = result
         return response
 
+    # ── Admin API (dashboard) ─────────────────────────────────────────────
+    from .admin.router import build_admin_router
+    from .admin.static import mount_spa
+
+    app.include_router(build_admin_router(store, config, embedder))
+    mount_spa(app)
+
     return app
 
 

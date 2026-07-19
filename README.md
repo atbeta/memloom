@@ -55,6 +55,13 @@ mp status
 
 # 7. (Push mode) Sync local agent stores to ingest server
 mp sync run ~/.memloom-sync/config.yaml --once
+
+# 8. Dashboard (optional) — overview / search / runs
+#    see docs/dashboard.md
+cd dashboard && npm install && npm run build
+export MEMLOOM_INGEST_KEY=...
+uv run memloom serve --config ./config/memloom.yaml --host 127.0.0.1
+# → http://127.0.0.1:8789/
 ```
 
 ## Layout
@@ -93,8 +100,9 @@ Idempotent — re-running picks up only what changed.
 ```
 Agents ──► Collectors ──► Pipeline ──► RawStore
                                   │
-                                  └──► (future) Vector index
-                                  └──► (future) MCP server
+                                  ├──► sqlite-vec hybrid search
+                                  ├──► HTTP ingest + MCP (/mcp)
+                                  └──► Admin dashboard (/api/admin + SPA)
 ```
 
 * **Collectors**: one per agent type. They know the agent's on-disk format and

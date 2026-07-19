@@ -184,6 +184,44 @@ class RawStore:
             row = c.execute("SELECT 1 FROM records WHERE id=?", (record_id,)).fetchone()
             return row is not None
 
+    def get_record(self, record_id: str) -> dict | None:
+        """Load a record by id from the index + on-disk JSON/Markdown.
+
+        Returns None if the id is unknown. ``record`` is the parsed JSON
+        payload; ``markdown`` is the human-readable mirror (may be empty).
+        """
+        with self._connect(self.index_path) as c:
+            row = c.execute(
+                """SELECT id, source, source_key, agent, project, role,
+                          captured_at, occurred_at, json_path, md_path
+                   FROM records WHERE id=?""",
+                (record_id,),
+            ).fetchone()
+        if not row:
+            return None
+        json_path = Path(row[8])
+        md_path = Path(row[9])
+        record_data: dict = {}
+        markdown = ""
+        if json_path.is_file():
+            record_data = json.loads(json_path.read_text(encoding="utf-8"))
+        if md_path.is_file():
+            markdown = md_path.read_text(encoding="utf-8")
+        return {
+            "id": row[0],
+            "source": row[1],
+            "source_key": row[2],
+            "agent": row[3] or "",
+            "project": row[4],
+            "role": row[5] or "",
+            "captured_at": row[6],
+            "occurred_at": row[7],
+            "json_path": str(json_path),
+            "md_path": str(md_path),
+            "record": record_data,
+            "markdown": markdown,
+        }
+
     def _record_rowid(self, c: sqlite3.Connection, record_id: str) -> int | None:
         """Get the integer rowid of a record (for joining with records_vec)."""
         row = c.execute("SELECT rowid FROM records WHERE id=?", (record_id,)).fetchone()

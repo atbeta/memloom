@@ -48,3 +48,20 @@ def test_watermark_persistence(tmp_path):
     store.upsert_watermark(wm)
     loaded = store.load_watermarks()
     assert loaded["openclaw::MEMORY.md"].last_seen_ms == 12345
+
+
+def test_get_record_roundtrip(tmp_path):
+    store = RawStore(tmp_path)
+    rec = MemoryRecord(
+        source="test",
+        source_key="k1",
+        content="hello admin",
+        role="note",
+    )
+    store.upsert(rec)
+    got = store.get_record(rec.id)
+    assert got is not None
+    assert got["id"] == rec.id
+    assert got["record"]["content"] == "hello admin"
+    assert "hello admin" in got["markdown"]
+    assert store.get_record("rec_nonexistent") is None

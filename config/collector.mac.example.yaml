@@ -3,7 +3,7 @@ hub: http://192.168.5.101:8789/ingest
 # export MEMLOOM_INGEST_KEY=...
 batch_size: 500
 state_dir: ~/.memloom-collector
-interval: 300
+interval: 3600
 
 sources:
   - type: opencode

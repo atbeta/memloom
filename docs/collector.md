@@ -33,7 +33,7 @@ memloom collector run ~/.config/memloom/collector.yaml --once
 memloom collector run ~/.config/memloom/collector.yaml --full
 
 # Loop (production sidecar)
-memloom collector run ~/.config/memloom/collector.yaml --loop --interval 300
+memloom collector run ~/.config/memloom/collector.yaml --loop --interval 3600
 
 # Dry-run
 memloom collector run ./collector.yaml --once --dry-run
@@ -57,12 +57,12 @@ memloom collector run ./collector.yaml --once --dry-run
 **cron (Linux):**
 
 ```cron
-*/5 * * * * MEMLOOM_INGEST_KEY=... /usr/local/bin/memloom collector run /etc/memloom/collector.yaml --once
+0 * * * * MEMLOOM_INGEST_KEY=... /usr/local/bin/memloom collector run /etc/memloom/collector.yaml --once
 ```
 
-**systemd timer:** oneshot service + `OnUnitActiveSec=5min`.
+**systemd timer:** oneshot service + `OnUnitActiveSec=1h`.
 
-**launchd (macOS):** `StartInterval` 300 calling the same command.
+**launchd (macOS):** `StartInterval` 3600 calling the same command.
 
 **Docker (101):** `memloom-collect` sidecar with `--loop` (see lab compose).
 

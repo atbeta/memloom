@@ -57,7 +57,7 @@ services:
         "/config/collector.yaml",
         "--loop",
         "--interval",
-        "300",
+        "3600",
       ]
     depends_on:
       memloom-server:

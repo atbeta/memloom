@@ -4,7 +4,7 @@ hub: http://memloom-server:8789/ingest
 batch_size: 500
 skip_embed: false
 state_dir: /tmp/memloom-collector-state
-interval: 300
+interval: 3600
 
 sources:
   - type: librechat

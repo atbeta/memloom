@@ -60,7 +60,8 @@ services:
         "300",
       ]
     depends_on:
-      - memloom-server
+      memloom-server:
+        condition: service_healthy
 
   # Optional Hub-side AnythingLLM mirror (not part of Collector)
   memloom-push:

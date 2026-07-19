@@ -232,7 +232,7 @@ def create_app(config: Config) -> FastAPI:
         score: float
         agent: str = ""
 
-    @app.get("/api/search")
+    @app.get("/api/search", dependencies=[Depends(_verify_bearer)])
     def search(q: str = "", source: str = "", limit: int = 20, hybrid: bool = True):
         """Full-text or hybrid search across all collected records."""
         if not q.strip():
@@ -296,7 +296,7 @@ def create_app(config: Config) -> FastAPI:
         },
     ]
 
-    @app.post("/mcp")
+    @app.post("/mcp", dependencies=[Depends(_verify_bearer)])
     def mcp_endpoint(req: dict):
         method = req.get("method", "")
         req_id = req.get("id")

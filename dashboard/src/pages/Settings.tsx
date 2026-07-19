@@ -102,14 +102,14 @@ export default function Settings() {
   }
 
   return (
-    <form onSubmit={onSave} className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h2 className="text-sm font-medium text-muted">Settings</h2>
-        <p className="mt-1 font-mono text-xs text-muted">
+    <form onSubmit={onSave} className="mx-auto max-w-3xl space-y-5">
+      <div className="panel panel-pad space-y-2">
+        <h2 className="section-title">Settings</h2>
+        <p className="font-mono text-xs text-muted">
           {data.path ?? '(no config path — writes disabled)'}
           {data.writable ? '' : ' · read-only'}
         </p>
-        <p className="mt-2 text-sm text-muted">
+        <p className="text-sm leading-relaxed text-muted">
           Common knobs only. Advanced options stay in the YAML file on disk.
         </p>
       </div>
@@ -117,7 +117,7 @@ export default function Settings() {
       <StatusLine error={error} />
       {notice ? <p className="font-mono text-sm text-accent">{notice}</p> : null}
 
-      <section className="space-y-3 border border-line bg-panel p-4">
+      <section className="panel panel-pad space-y-4">
         <h3 className="text-sm font-medium">Pipeline</h3>
         <Field label="data_root">
           <input
@@ -145,7 +145,7 @@ export default function Settings() {
         </Field>
       </section>
 
-      <section className="space-y-3 border border-line bg-panel p-4">
+      <section className="panel panel-pad space-y-4">
         <h3 className="text-sm font-medium">Privacy</h3>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -174,7 +174,7 @@ export default function Settings() {
         </label>
       </section>
 
-      <section className="space-y-3 border border-line bg-panel p-4">
+      <section className="panel panel-pad space-y-4">
         <h3 className="text-sm font-medium">Embed</h3>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -216,7 +216,7 @@ export default function Settings() {
         </Field>
       </section>
 
-      <section className="space-y-3 border border-line bg-panel p-4">
+      <section className="panel panel-pad space-y-3">
         <h3 className="text-sm font-medium">Hosts (JSON)</h3>
         <textarea
           className="field min-h-32 font-mono text-xs"
@@ -225,7 +225,7 @@ export default function Settings() {
         />
       </section>
 
-      <section className="space-y-3 border border-line bg-panel p-4">
+      <section className="panel panel-pad space-y-3">
         <h3 className="text-sm font-medium">Agents (JSON)</h3>
         <textarea
           className="field min-h-40 font-mono text-xs"
@@ -237,7 +237,7 @@ export default function Settings() {
       <button
         type="submit"
         disabled={!data.writable || saving}
-        className="bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-accent disabled:opacity-40"
+        className="btn btn-primary px-5"
       >
         {saving ? 'Saving…' : 'Save settings'}
       </button>
@@ -249,7 +249,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block text-sm">
       <span className="text-muted">{label}</span>
-      <div className="mt-1">{children}</div>
+      <div className="mt-1.5">{children}</div>
     </label>
   )
 }

@@ -56,17 +56,17 @@ export default function Pipeline() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium text-muted">Collector runs</h2>
-          <p className="mt-1 text-sm text-muted">Trigger one collect pass (same as CLI).</p>
+    <div className="space-y-5">
+      <div className="panel panel-pad flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1.5">
+          <h2 className="section-title">Collector runs</h2>
+          <p className="text-sm text-muted">Trigger one collect pass (same as CLI).</p>
         </div>
         <button
           type="button"
           onClick={() => void runCollect()}
           disabled={collecting}
-          className="bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:opacity-40"
+          className="btn btn-primary"
         >
           {collecting ? 'Collecting…' : 'Run collect'}
         </button>
@@ -76,37 +76,39 @@ export default function Pipeline() {
       {notice ? <p className="font-mono text-sm text-accent">{notice}</p> : null}
 
       {!loading && runs.length === 0 ? (
-        <StatusLine empty="No collector runs yet. Run collect above or `memloom collect`." />
-      ) : (
-        <div className="overflow-x-auto border border-line bg-panel">
+        <div className="panel panel-pad">
+          <StatusLine empty="No collector runs yet. Run collect above or `memloom collect`." />
+        </div>
+      ) : runs.length > 0 ? (
+        <div className="panel overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-left text-muted">
-                <th className="px-3 py-2 font-medium">started</th>
-                <th className="px-3 py-2 font-medium">source</th>
-                <th className="px-3 py-2 font-medium">host</th>
-                <th className="px-3 py-2 text-right font-medium">discovered</th>
-                <th className="px-3 py-2 text-right font-medium">new</th>
-                <th className="px-3 py-2 text-right font-medium">dup</th>
-                <th className="px-3 py-2 text-right font-medium">filtered</th>
-                <th className="px-3 py-2 text-right font-medium">errors</th>
-                <th className="px-3 py-2 text-right font-medium">duration</th>
+                <th className="px-4 py-3 font-medium">started</th>
+                <th className="px-4 py-3 font-medium">source</th>
+                <th className="px-4 py-3 font-medium">host</th>
+                <th className="px-4 py-3 text-right font-medium">discovered</th>
+                <th className="px-4 py-3 text-right font-medium">new</th>
+                <th className="px-4 py-3 text-right font-medium">dup</th>
+                <th className="px-4 py-3 text-right font-medium">filtered</th>
+                <th className="px-4 py-3 text-right font-medium">errors</th>
+                <th className="px-4 py-3 text-right font-medium">duration</th>
               </tr>
             </thead>
             <tbody>
               {runs.map((r) => (
                 <tr key={r.run_id} className="border-b border-line/70 align-top">
-                  <td className="px-3 py-2 font-mono text-xs">{formatTs(r.started_at)}</td>
-                  <td className="px-3 py-2 font-mono">{r.source}</td>
-                  <td className="px-3 py-2 font-mono">{r.host}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{r.discovered}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{r.new_records}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{r.duplicates}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{r.filtered}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
+                  <td className="px-4 py-3 font-mono text-xs">{formatTs(r.started_at)}</td>
+                  <td className="px-4 py-3 font-mono">{r.source}</td>
+                  <td className="px-4 py-3 font-mono">{r.host}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{r.discovered}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{r.new_records}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{r.duplicates}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{r.filtered}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">
                     {r.errors.length}
                     {r.errors.length > 0 ? (
-                      <details className="mt-1 text-left text-[11px] text-danger">
+                      <details className="mt-1.5 text-left text-[11px] text-danger">
                         <summary className="cursor-pointer">details</summary>
                         <ul className="mt-1 list-disc pl-4">
                           {r.errors.slice(0, 5).map((err, i) => (
@@ -116,7 +118,7 @@ export default function Pipeline() {
                       </details>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">
                     {formatDuration(r.started_at, r.finished_at)}
                   </td>
                 </tr>
@@ -124,7 +126,7 @@ export default function Pipeline() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

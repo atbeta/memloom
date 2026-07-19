@@ -2,17 +2,19 @@ type Props = {
   loading?: boolean
   error?: string | null
   empty?: string | null
+  className?: string
 }
 
-export function StatusLine({ loading, error, empty }: Props) {
+export function StatusLine({ loading, error, empty, className = '' }: Props) {
+  const base = ['font-mono text-sm', className].filter(Boolean).join(' ')
   if (loading) {
-    return <p className="font-mono text-sm text-muted">Loading…</p>
+    return <p className={`${base} text-muted`}>Loading…</p>
   }
   if (error) {
-    return <p className="font-mono text-sm text-danger">{error}</p>
+    return <p className={`${base} text-danger`}>{error}</p>
   }
   if (empty) {
-    return <p className="font-mono text-sm text-muted">{empty}</p>
+    return <p className={`${base} text-muted`}>{empty}</p>
   }
   return null
 }

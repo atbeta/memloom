@@ -5,12 +5,14 @@
   --font-mono: "IBM Plex Mono", "SF Mono", "Menlo", monospace;
   --color-ink: #1a1f24;
   --color-muted: #5c6770;
-  --color-line: #d7dde3;
-  --color-surface: #f4f6f8;
+  --color-line: #d5dce3;
+  --color-surface: #f3f5f7;
   --color-panel: #ffffff;
   --color-accent: #0b6e4f;
   --color-accent-soft: #e6f3ee;
   --color-danger: #b42318;
+  --radius-panel: 6px;
+  --shadow-panel: 0 1px 2px rgb(26 31 36 / 4%), 0 1px 3px rgb(26 31 36 / 3%);
 }
 
 @layer base {
@@ -28,6 +30,7 @@
       radial-gradient(1200px 600px at 10% -10%, #e8f0ec 0%, transparent 55%),
       radial-gradient(900px 500px at 100% 0%, #e7eef5 0%, transparent 50%),
       var(--color-surface);
+    -webkit-font-smoothing: antialiased;
   }
 
   * {
@@ -48,16 +51,99 @@
 }
 
 @layer components {
+  .panel {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .panel-pad {
+    padding: 1rem 1.125rem;
+  }
+
   .field {
     width: 100%;
     border: 1px solid var(--color-line);
+    border-radius: 4px;
+    background: var(--color-surface);
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+
+  .field:focus {
+    border-color: var(--color-accent);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--color-ink);
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent);
+  }
+
+  .btn-ghost {
+    color: var(--color-muted);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-panel);
+    color: var(--color-ink);
+  }
+
+  .btn-soft {
+    background: transparent;
+    color: var(--color-muted);
+  }
+
+  .btn-soft:hover:not(:disabled) {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .btn-soft-active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .section-title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    letter-spacing: 0.01em;
+  }
+
+  .input-inline {
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
     background: var(--color-surface);
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     outline: none;
+    transition: border-color 120ms ease;
   }
 
-  .field:focus {
+  .input-inline:focus {
     border-color: var(--color-accent);
   }
 }

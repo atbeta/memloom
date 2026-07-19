@@ -126,151 +126,153 @@ export default function Explorer() {
     }
   }
 
+  const showEmpty = !loading && !error && hits.length === 0
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {notice ? <p className="font-mono text-sm text-accent">{notice}</p> : null}
-    <div className="flex min-h-[70vh] flex-col gap-4 lg:flex-row">
-      <section className="flex w-full flex-col lg:w-[42%]">
-        <form onSubmit={onSearch} className="space-y-2 border border-line bg-panel p-3">
-          <div className="flex gap-2">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="FTS5 / hybrid query"
-              className="min-w-0 flex-1 border border-line bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              className="bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-accent"
-            >
-              Search
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <label className="flex items-center gap-1.5">
-              <span className="text-muted">source</span>
-              <input
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder="optional"
-                className="w-36 border border-line bg-surface px-2 py-1 font-mono text-xs outline-none focus:border-accent"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-muted">
-              <input
-                type="checkbox"
-                checked={hybrid}
-                onChange={(e) => setHybrid(e.target.checked)}
-              />
-              hybrid
-            </label>
-          </div>
-        </form>
 
-        <div className="mt-3 min-h-0 flex-1 overflow-auto border border-line bg-panel">
-          <StatusLine
-            loading={loading}
-            error={error && !selected ? error : null}
-            empty={!loading && !error && hits.length === 0 ? 'No results.' : null}
-          />
-          <ul className="divide-y divide-line">
-            {hits.map((h) => (
-              <li key={h.id}>
-                <button
-                  type="button"
-                  onClick={() => openRecord(h.id)}
-                  className={[
-                    'block w-full px-3 py-2 text-left hover:bg-accent-soft',
-                    selected?.id === h.id ? 'bg-accent-soft' : '',
-                  ].join(' ')}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-xs text-accent">{h.source}</span>
-                    <span className="font-mono text-[11px] text-muted">{formatTs(h.captured_at)}</span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm">{h.content || '(empty snippet)'}</p>
-                  <p className="mt-1 truncate font-mono text-[11px] text-muted">{h.id}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="flex min-h-[50vh] flex-1 flex-col border border-line bg-panel">
-        {!selected && !detailLoading ? (
-          <div className="flex flex-1 items-center justify-center p-6">
-            <StatusLine empty="Select a result to inspect the raw record." />
-          </div>
-        ) : detailLoading ? (
-          <div className="p-4">
-            <StatusLine loading />
-          </div>
-        ) : selected ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate font-mono text-xs text-muted">{selected.id}</p>
-                <p className="truncate text-sm">
-                  <span className="font-mono text-accent">{selected.source}</span>
-                  <span className="text-muted"> · {selected.role}</span>
-                  {selected.project ? (
-                    <span className="text-muted"> · {selected.project}</span>
-                  ) : null}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setView('markdown')}
-                  className={
-                    view === 'markdown'
-                      ? 'bg-accent-soft px-2 py-1 text-accent'
-                      : 'px-2 py-1 text-muted hover:text-ink'
-                  }
-                >
-                  Markdown
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('json')}
-                  className={
-                    view === 'json'
-                      ? 'bg-accent-soft px-2 py-1 text-accent'
-                      : 'px-2 py-1 text-muted hover:text-ink'
-                  }
-                >
-                  JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void quarantineSelected()}
-                  disabled={busyId === selected.id}
-                  className="px-2 py-1 text-danger hover:bg-surface disabled:opacity-40"
-                >
-                  Quarantine
-                </button>
-              </div>
+      <div className="flex min-h-[70vh] flex-col gap-5 lg:flex-row">
+        <section className="flex w-full flex-col gap-4 lg:w-[42%]">
+          <form onSubmit={onSearch} className="panel panel-pad space-y-3">
+            <div className="flex gap-2.5">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="FTS5 / hybrid query"
+                className="input-inline min-w-0 flex-1 font-mono"
+              />
+              <button type="submit" className="btn btn-primary shrink-0">
+                Search
+              </button>
             </div>
-            <pre className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-              {view === 'markdown'
-                ? selected.markdown || '(empty markdown)'
-                : JSON.stringify(selected.record, null, 2)}
-            </pre>
-          </>
-        ) : null}
-      </section>
-    </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <label className="flex items-center gap-2">
+                <span className="text-muted">source</span>
+                <input
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="optional"
+                  className="input-inline w-40 px-2.5 py-1.5 font-mono text-xs"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-muted">
+                <input
+                  type="checkbox"
+                  checked={hybrid}
+                  onChange={(e) => setHybrid(e.target.checked)}
+                />
+                hybrid
+              </label>
+            </div>
+          </form>
 
-      <section className="border border-line bg-panel p-3">
-        <h2 className="text-sm font-medium text-muted">Quarantine</h2>
+          <div className="panel flex min-h-48 flex-1 flex-col overflow-hidden">
+            {(loading || error || showEmpty) && (
+              <div className="panel-pad">
+                <StatusLine
+                  loading={loading}
+                  error={error && !selected ? error : null}
+                  empty={showEmpty ? 'No results.' : null}
+                />
+              </div>
+            )}
+            {hits.length > 0 && (
+              <ul className="divide-y divide-line overflow-auto">
+                {hits.map((h) => (
+                  <li key={h.id}>
+                    <button
+                      type="button"
+                      onClick={() => openRecord(h.id)}
+                      className={[
+                        'block w-full px-4 py-3 text-left transition-colors hover:bg-accent-soft',
+                        selected?.id === h.id ? 'bg-accent-soft' : '',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-xs text-accent">{h.source}</span>
+                        <span className="font-mono text-[11px] text-muted">
+                          {formatTs(h.captured_at)}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 line-clamp-2 text-sm leading-snug">
+                        {h.content || '(empty snippet)'}
+                      </p>
+                      <p className="mt-1.5 truncate font-mono text-[11px] text-muted">{h.id}</p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="panel flex min-h-[50vh] flex-1 flex-col overflow-hidden">
+          {!selected && !detailLoading ? (
+            <div className="flex flex-1 items-center justify-center px-6 py-10">
+              <StatusLine empty="Select a result to inspect the raw record." />
+            </div>
+          ) : detailLoading ? (
+            <div className="panel-pad">
+              <StatusLine loading />
+            </div>
+          ) : selected ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate font-mono text-xs text-muted">{selected.id}</p>
+                  <p className="truncate text-sm">
+                    <span className="font-mono text-accent">{selected.source}</span>
+                    <span className="text-muted"> · {selected.role}</span>
+                    {selected.project ? (
+                      <span className="text-muted"> · {selected.project}</span>
+                    ) : null}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setView('markdown')}
+                    className={`btn ${view === 'markdown' ? 'btn-soft-active' : 'btn-soft'}`}
+                  >
+                    Markdown
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setView('json')}
+                    className={`btn ${view === 'json' ? 'btn-soft-active' : 'btn-soft'}`}
+                  >
+                    JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void quarantineSelected()}
+                    disabled={busyId === selected.id}
+                    className="btn text-danger hover:bg-surface"
+                  >
+                    Quarantine
+                  </button>
+                </div>
+              </div>
+              <pre className="min-h-0 flex-1 overflow-auto px-4 py-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                {view === 'markdown'
+                  ? selected.markdown || '(empty markdown)'
+                  : JSON.stringify(selected.record, null, 2)}
+              </pre>
+            </>
+          ) : null}
+        </section>
+      </div>
+
+      <section className="panel panel-pad">
+        <h2 className="section-title">Quarantine</h2>
         {quarantine.length === 0 ? (
-          <p className="mt-2 font-mono text-sm text-muted">Empty.</p>
+          <p className="mt-3 font-mono text-sm text-muted">Empty.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-line">
+          <ul className="mt-3 divide-y divide-line">
             {quarantine.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <div className="min-w-0">
+              <li key={item.id} className="flex items-center justify-between gap-4 py-3 text-sm">
+                <div className="min-w-0 space-y-1">
                   <p className="truncate font-mono text-xs text-accent">{item.source}</p>
                   <p className="truncate font-mono text-[11px] text-muted">{item.id}</p>
                 </div>
@@ -278,7 +280,7 @@ export default function Explorer() {
                   type="button"
                   onClick={() => void restoreQuarantined(item.id)}
                   disabled={busyId === item.id}
-                  className="shrink-0 px-2 py-1 text-accent hover:bg-accent-soft disabled:opacity-40"
+                  className="btn btn-soft shrink-0"
                 >
                   Restore
                 </button>

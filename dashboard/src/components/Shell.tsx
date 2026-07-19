@@ -10,11 +10,11 @@ const links = [
 
 export function Shell() {
   return (
-    <div className="mx-auto flex min-h-full max-w-7xl flex-col px-4 py-4 md:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
-        <div>
-          <p className="font-mono text-xs tracking-[0.18em] text-accent uppercase">memloom</p>
-          <h1 className="text-xl font-semibold tracking-tight">Memory console</h1>
+    <div className="mx-auto flex min-h-full max-w-7xl flex-col px-5 py-5 md:px-8 md:py-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-4">
+        <div className="space-y-1">
+          <p className="font-mono text-[11px] tracking-[0.2em] text-accent uppercase">memloom</p>
+          <h1 className="text-xl font-semibold tracking-tight md:text-[1.35rem]">Memory console</h1>
         </div>
         <nav className="flex flex-wrap items-center gap-1">
           {links.map((l) => (
@@ -24,10 +24,8 @@ export function Shell() {
               end={l.end}
               className={({ isActive }) =>
                 [
-                  'px-3 py-1.5 text-sm',
-                  isActive
-                    ? 'bg-accent-soft font-medium text-accent'
-                    : 'text-muted hover:bg-panel hover:text-ink',
+                  'btn rounded-md px-3.5 py-1.5',
+                  isActive ? 'btn-soft-active' : 'btn-ghost',
                 ].join(' ')
               }
             >
@@ -40,13 +38,13 @@ export function Shell() {
               clearKey()
               window.location.reload()
             }}
-            className="ml-2 px-3 py-1.5 text-sm text-muted hover:text-ink"
+            className="btn btn-ghost ml-1"
           >
             Sign out
           </button>
         </nav>
       </header>
-      <main className="flex-1 py-5">
+      <main className="flex-1 py-6 md:py-7">
         <Outlet />
       </main>
     </div>
